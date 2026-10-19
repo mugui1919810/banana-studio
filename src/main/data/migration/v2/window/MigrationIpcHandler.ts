@@ -12,6 +12,7 @@ import type { MigrationPaths } from '@data/migration/v2/core/MigrationPaths'
 import type { VersionBlockReason } from '@data/migration/v2/core/versionPolicy'
 import { loggerService } from '@logger'
 import { validateSender } from '@main/core/security/validateSender'
+import { t } from '@main/i18n'
 import {
   type MigrationDiagnosticSavePayload,
   type MigrationDiagnosticSaveResult,
@@ -56,23 +57,6 @@ let dataLocationNotice: string | null = null
 
 function assertMigrationWindowSender(event: IpcMainInvokeEvent): void {
   if (!validateSender(event)) throw new Error('Unauthorized migration IPC sender.')
-}
-
-// The migration window runs on the `simplest` preload (ipcRenderer only), so opening the v1
-// download page has to go through main — which also owns the URL table, so the renderer only
-// names a language and can never turn this into an arbitrary shell.openExternal call.
-// The v1-specific page, since the button offers v1 rather than the current release.
-const V1_DOWNLOAD_URL_CN = 'https://cherryai.com.cn/download/v1'
-const V1_DOWNLOAD_URL_GLOBAL = 'https://cherryai.com/download/v1'
-
-/**
- * Picks the download site from the wizard's language, using the same `zh` test the window's
- * i18n resolver uses to pick that language — so the site is the one the user can read.
- * Anything else, including a missing or malformed value, lands on the global site.
- */
-function resolveV1DownloadUrl(language: unknown): string {
-  const isChinese = typeof language === 'string' && language.toLowerCase().includes('zh')
-  return isChinese ? V1_DOWNLOAD_URL_CN : V1_DOWNLOAD_URL_GLOBAL
 }
 
 const MigrationDiagnosticSavePayloadSchema: z.ZodType<MigrationDiagnosticSavePayload> = z.strictObject({
@@ -286,14 +270,14 @@ export function registerMigrationIpcHandlers(paths: MigrationPaths): void {
     }
   })
 
-  // Open the region-appropriate v1 download page when selected from the migration fallback options.
-  ipcMain.handle(MigrationIpcChannels.OpenDownloadPage, async (event: IpcMainInvokeEvent, language: unknown) => {
+  // The migration fallback offers an upstream v1 download; this fork only shows the release notice.
+  ipcMain.handle(MigrationIpcChannels.OpenDownloadPage, async (event: IpcMainInvokeEvent, _language: unknown) => {
     assertMigrationWindowSender(event)
     try {
-      await shell.openExternal(resolveV1DownloadUrl(language))
+      await dialog.showMessageBox({ type: 'info', message: t('fork.external_link_unavailable') })
       return true
     } catch (error) {
-      logger.warn('Failed to open v1 download page', error as Error)
+      logger.warn('Failed to show the fork notice for the v1 download page', error as Error)
       return false
     }
   })

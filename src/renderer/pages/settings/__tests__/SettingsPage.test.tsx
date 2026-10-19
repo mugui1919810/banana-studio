@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import zhCN from '@renderer/i18n/locales/zh-cn.json'
 import { ipcApi } from '@renderer/ipc'
+import { toast } from '@renderer/services/toast'
 
 import SettingsPage from '../SettingsPage'
 
@@ -69,6 +70,10 @@ vi.mock('@tanstack/react-router', () => ({
   useSearch: () => ({})
 }))
 
+vi.mock('@renderer/i18n/resolver', () => ({
+  default: { t: (key: string) => key }
+}))
+
 vi.mock('react-i18next', () => ({
   initReactI18next: { type: '3rdParty', init: vi.fn() },
   useTranslation: () => ({
@@ -118,7 +123,11 @@ describe('SettingsPage', () => {
       const event = new MouseEvent(type, { bubbles: true, cancelable: true, button: type === 'auxclick' ? 1 : 0 })
       fireEvent(screen.getByText('Provider website'), event)
       expect(event.defaultPrevented).toBe(true)
-      expect(ipcApi.request).toHaveBeenCalledWith('system.shell.open_external_website', 'https://open.cherryin.ai/')
+      expect(toast.info).toHaveBeenCalledWith('fork.external_link_unavailable')
+      expect(ipcApi.request).not.toHaveBeenCalledWith(
+        'system.shell.open_external_website',
+        'https://open.cherryin.ai/'
+      )
     }
   )
 

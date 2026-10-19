@@ -4,7 +4,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const mocks = vi.hoisted(() => ({
   ipcRequest: vi.fn(),
   statusChanged: undefined as ((status: { phase: string; displayName: string | null }) => void) | undefined,
-  toastError: vi.fn()
+  toastError: vi.fn(),
+  toastInfo: vi.fn()
 }))
 
 vi.mock('@renderer/ipc', () => ({
@@ -14,11 +15,8 @@ vi.mock('@renderer/ipc', () => ({
   }
 }))
 
-vi.mock('@renderer/services/toast', () => ({ toast: { error: mocks.toastError } }))
+vi.mock('@renderer/services/toast', () => ({ toast: { error: mocks.toastError, info: mocks.toastInfo } }))
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }))
-
-import { cherryCloudErrorCodes } from '@shared/ipc/errors/cherryCloud'
-import { IpcError } from '@shared/ipc/errors/IpcError'
 
 import { useCherryAccountSession } from '../useCherryAccountSession'
 
@@ -38,6 +36,19 @@ describe('useCherryAccountSession', () => {
     mocks.ipcRequest.mockReset().mockResolvedValue(signedOut)
     mocks.statusChanged = undefined
     mocks.toastError.mockReset()
+    mocks.toastInfo.mockReset()
+  })
+
+  it('shows the fork notice instead of starting a login', async () => {
+    const { result } = renderHook(() => useCherryAccountSession())
+    await waitFor(() => expect(result.current.loadState).toBe('ready'))
+    mocks.ipcRequest.mockClear()
+
+    await act(() => result.current.login())
+
+    expect(mocks.toastInfo).toHaveBeenCalledWith('fork.login_closed')
+    expect(mocks.ipcRequest).not.toHaveBeenCalled()
+    expect(result.current.isStartingLogin).toBe(false)
   })
 
   it('does not let an older status request overwrite a newer status event', async () => {
@@ -56,7 +67,6 @@ describe('useCherryAccountSession', () => {
   })
 
   it.each([
-    ['login', 'cherry_cloud.login.start', 'isStartingLogin', { phase: 'authorizing', displayName: null }],
     ['cancelLogin', 'cherry_cloud.login.cancel', 'isCancellingLogin', signedOut],
     ['revokeSession', 'cherry_cloud.session.revoke', 'isRevokingSession', signedOut]
   ] as const)('runs %s with an isolated loading state', async (action, route, pendingFlag, nextStatus) => {
@@ -83,9 +93,6 @@ describe('useCherryAccountSession', () => {
   })
 
   it.each([
-    ['login', new IpcError(cherryCloudErrorCodes.LOGIN_SERVICE_UNAVAILABLE), 'error.http.503'],
-    ['login', new IpcError('CHERRY_CLOUD_UPGRADE_REQUIRED'), 'settings.provider.cherry_cloud.upgrade_required'],
-    ['login', new Error('Cherry Cloud login request failed (400)'), 'settings.provider.cherry_cloud.sign_in_failed'],
     ['cancelLogin', new Error('cancel failed'), 'settings.provider.cherry_cloud.sign_in_failed'],
     ['revokeSession', new Error('revoke failed'), 'settings.provider.cherry_cloud.logout_failed']
   ] as const)('translates %s failures', async (action, error, message) => {

@@ -162,7 +162,7 @@ const translations: Record<string, string> = {
   'settings.doctor.evidence.local_details': 'Local details',
   'settings.doctor.evidence.local_only': 'Local only',
   'settings.doctor.fixes.repair_boot_config': 'Repair startup configuration',
-  'settings.doctor.messages.relaunch_required': 'Restart Cherry Studio to apply the repair.',
+  'settings.doctor.messages.relaunch_required': 'Restart Banana Studio to apply the repair.',
   'settings.doctor.status.fail': 'Failed',
   'settings.doctor.status.pass': 'Passed',
   'settings.doctor.status.pending': 'Pending',
@@ -456,7 +456,7 @@ describe('ErrorDetailContent diagnostics', () => {
 
     await act(async () => resolveFix({ status: 'requires_relaunch' }))
 
-    expect(await screen.findByText('Restart Cherry Studio to apply the repair.')).toBeInTheDocument()
+    expect(await screen.findByText('Restart Banana Studio to apply the repair.')).toBeInTheDocument()
     const result = screen.getByRole('region', { name: 'Diagnostic result' })
     expect(result).toHaveTextContent('Fixed: Startup configuration; needs attention: 1 item.')
     expect(screen.getByRole('button', { name: 'Close' })).toBeInTheDocument()

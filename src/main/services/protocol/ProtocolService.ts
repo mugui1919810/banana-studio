@@ -264,7 +264,7 @@ export class ProtocolService extends BaseService {
       }
 
       const desktopFileContent = `[Desktop Entry]
-Name=Cherry Studio
+Name=Banana Studio
 Exec=${escapePathForExec(appPath)} %U
 Terminal=false
 Type=Application

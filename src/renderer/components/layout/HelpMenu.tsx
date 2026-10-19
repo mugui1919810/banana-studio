@@ -8,7 +8,8 @@ import AppLogo from '@renderer/assets/images/logo.png'
 import { DoctorPopup } from '@renderer/components/doctor'
 import type { SidebarVisibleLayout } from '@renderer/components/Sidebar'
 import { useMiniAppPopup } from '@renderer/hooks/useMiniAppPopup'
-import { useOpenReleaseNotes } from '@renderer/hooks/useOpenReleaseNotes'
+import { toast } from '@renderer/services/toast'
+import { isForkBlockedUrl } from '@shared/utils/forkExternalLink'
 
 const logger = loggerService.withContext('HelpMenu')
 
@@ -23,7 +24,6 @@ export function HelpMenu({
 }) {
   const { t, i18n } = useTranslation()
   const { openSmartMiniApp } = useMiniAppPopup()
-  const openReleaseNotes = useOpenReleaseNotes()
   const [menuOpen, setMenuOpen] = useState(false)
   const firstActionRef = useRef<HTMLButtonElement>(null)
   const menuOpenRef = useRef(false)
@@ -60,6 +60,10 @@ export function HelpMenu({
       language === 'zh-CN' || language === 'zh-TW'
         ? 'https://docs.cherryai.com.cn/'
         : 'https://docs.cherryai.com.cn/docs/en-us'
+    if (isForkBlockedUrl(url)) {
+      toast.info(t('fork.external_link_unavailable'))
+      return
+    }
     openSmartMiniApp({
       appId: 'cherrystudio-guide',
       name: t('help.guide'),
@@ -125,7 +129,11 @@ export function HelpMenu({
               ref={firstActionRef}
               icon={<Sparkles size={16} />}
               label={t('help.whats_new')}
-              onClick={() => runAfterClose(openReleaseNotes)}
+              onClick={() =>
+                runAfterClose(() => {
+                  toast.info(t('fork.external_link_unavailable'))
+                })
+              }
             />
             <MenuItem
               size="sm"

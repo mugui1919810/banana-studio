@@ -14,7 +14,7 @@ const TOKEN_DANCE_CONFIG = {
   authorizeUrl: 'https://tokendance.space/auth',
   exchangeUrl: 'https://tokendance.space/portal/api/v1/auth/keys',
   appUrl: TOKEN_DANCE_APP_URL,
-  keyName: 'Cherry Studio',
+  keyName: 'Banana Studio',
   callbackPath: '/oauth/tokendance/callback',
   authorizationTimeoutMs: 10 * 60 * 1000,
   exchangeTimeoutMs: 30 * 1000

@@ -230,7 +230,7 @@ const PopupContainer: React.FC<Props> = ({ open, resolve }) => {
                   variant="emphasis">
                   {isAuthorizing
                     ? t('settings.provider.cherry_cloud.signing_in')
-                    : t('settings.provider.cherry_cloud.login')}
+                    : t('fork.login_closed')}
                 </Button>
                 {isAuthorizing ? (
                   <Button

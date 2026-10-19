@@ -382,6 +382,14 @@ const AgentChat = ({
     runtimeUiMessages,
     sessionTopicId
   ])
+  if (activeAgent && (isAssistantAgent || isSupportAgent)) {
+    return (
+      <div className="flex h-full w-full items-center justify-center p-6 text-center text-muted-foreground">
+        {t('fork.builtin_agent_unavailable')}
+      </div>
+    )
+  }
+
   const rightPaneTools =
     !centerSurface && (sessionSnapshot || resourcePane) ? (
       <>

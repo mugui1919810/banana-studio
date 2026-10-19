@@ -22,6 +22,7 @@ import {
 import type { OcrRecognitionResult } from '@shared/ipc/schemas/screenshot'
 import type { WindowId } from '@shared/ipc/types'
 import type { DetectedWindow, ScreenshotInitData, ScreenshotResultData } from '@shared/types/screenshot'
+import { APP_NAME } from '@shared/utils/constants'
 
 import { isScreenshotOcrAvailable, recognizeScreenshotText } from './recognizeText'
 import { captureAllMonitors, listMonitors } from './screenCapture'
@@ -895,7 +896,7 @@ export class ScreenshotOverlayService extends BaseService {
   private async showPermissionDialog(): Promise<void> {
     // The grant attaches to the running binary, which in development is the generic
     // Electron one — naming the product sends the user after a non-existent entry.
-    const appName = isDev ? 'Electron' : app.getName()
+    const appName = isDev ? 'Electron' : APP_NAME
     const { response } = await dialog.showMessageBox({
       type: 'warning',
       title: t('dialog.screen_capture_permission.title'),

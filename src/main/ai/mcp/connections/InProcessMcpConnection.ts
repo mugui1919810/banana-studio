@@ -19,7 +19,7 @@ export async function createInProcessMcpConnection({
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair()
   const handle = serveStdio(() => endpoint.createServer(), { transport: serverTransport, legacy: 'reject' })
   const connection = new ClientMcpConnection(
-    { name: 'Cherry Studio', version: appVersion },
+    { name: 'Banana Studio', version: appVersion },
     {
       capabilities: {
         elicitation: { form: {}, url: {} },

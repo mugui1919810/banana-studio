@@ -23,12 +23,12 @@ import {
   isAllowedAgentDevPreviewEntryUrl,
   isAllowedAgentHtmlArtifactEntryUrl
 } from '@main/utils/agentWebviewRequest'
-import { getAppEdition } from '@main/utils/appEdition'
 import { isAllowedHtmlArtifactRequest } from '@main/utils/htmlArtifactRequest'
 import { getWindowsBackgroundMaterial, replaceDevtoolsFont } from '@main/utils/windowUtil'
 import { IpcChannel } from '@shared/IpcChannel'
 import type { MainWindowInitData } from '@shared/types/mainWindow'
 import { normalizeBrowserEntryUrl, normalizeBrowserUrl } from '@shared/utils/browserUrl'
+import { isForkBlockedUrl } from '@shared/utils/forkExternalLink'
 import { HTML_ARTIFACT_PREVIEW_DATA_URL_PREFIX, HTML_ARTIFACT_PREVIEW_PARTITION } from '@shared/utils/htmlArtifact'
 import { getWebviewPartition, getWebviewSecurityProfile, WebviewSecurityProfile } from '@shared/utils/webviewSecurity'
 import { MIN_WINDOW_HEIGHT, MIN_WINDOW_WIDTH } from '@shared/utils/window'
@@ -393,7 +393,7 @@ export class MainWindowService extends BaseService {
     const handleWillDownload = (event: Electron.Event) => event.preventDefault()
     const userAgent = restrictedSession
       .getUserAgent()
-      .replace(/CherryStudio\/\S+\s/, '')
+      .replace(/(?:CherryStudio|BananaStudio)\/\S+\s/, '')
       .replace(/Electron\/\S+\s/, '')
 
     restrictedSession.setUserAgent(userAgent)
@@ -516,16 +516,17 @@ export class MainWindowService extends BaseService {
       noLink: true
     })
     if (response === 0) {
-      await shell.openExternal(
-        getAppEdition() === 'cn' ? 'https://cherryai.com.cn/download' : 'https://cherryai.com/download'
-      )
+      await dialog.showMessageBox(mainWindow, {
+        type: 'info',
+        message: t('fork.external_link_unavailable')
+      })
     }
   }
 
   private setupWindowEvents(mainWindow: BrowserWindow) {
     mainWindow.once('show', () => {
       void this.showArchitectureWarning(mainWindow).catch((error) => {
-        logger.error('Failed to show architecture warning or open download page', error)
+        logger.error('Failed to show architecture warning or its release notice', error)
       })
     })
 
@@ -581,6 +582,10 @@ export class MainWindowService extends BaseService {
   async openWebsite(url: string, external = false): Promise<void> {
     if (!isSafeExternalUrl(url)) {
       logger.warn('Blocked website URL with an unsupported scheme')
+      return
+    }
+    if (isForkBlockedUrl(url)) {
+      await dialog.showMessageBox({ type: 'info', message: t('fork.external_link_unavailable') })
       return
     }
     const parsed = new URL(url)

@@ -288,7 +288,7 @@ export function useDoctorController({
           await performAction(
             { actionKind: action.kind, checkId },
             () => ipcApi.request('app.relaunch'),
-            'Failed to relaunch Cherry Studio'
+            'Failed to relaunch Banana Studio'
           )
           return
         case 'report':

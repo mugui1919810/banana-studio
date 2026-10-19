@@ -56,7 +56,7 @@ function isTransportFallbackError(error: unknown): boolean {
 
 function createClient(appVersion: string, events: McpConnectionEvents): ClientMcpConnection {
   return new ClientMcpConnection(
-    { name: 'Cherry Studio', version: appVersion },
+    { name: 'Banana Studio', version: appVersion },
     {
       capabilities: {
         elicitation: { form: {}, url: {} },

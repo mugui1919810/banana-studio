@@ -25,7 +25,7 @@ const translations: Record<string, string> = {
   'migration.diagnostics.open_folder': 'Open file location',
   'migration.diagnostics.open_folder_failed': 'Could not open file location',
   'migration.diagnostics.privacy':
-    'Application logs may contain file paths, error stacks, user content, or credentials. Do not share them publicly or with anyone outside the Cherry Studio support team.',
+    'Application logs may contain file paths, error stacks, user content, or credentials. Do not share them publicly or with anyone outside the Banana Studio support team.',
   'migration.diagnostics.save': 'Save diagnostic bundle',
   'migration.diagnostics.save_failed': 'Could not save diagnostic bundle',
   'migration.diagnostics.saved_local':
@@ -104,7 +104,7 @@ describe('MigrationDiagnosticPanel', () => {
 
     expect(
       screen.getByText(
-        'Application logs may contain file paths, error stacks, user content, or credentials. Do not share them publicly or with anyone outside the Cherry Studio support team.'
+        'Application logs may contain file paths, error stacks, user content, or credentials. Do not share them publicly or with anyone outside the Banana Studio support team.'
       )
     ).toBeInTheDocument()
     const section = container.querySelector('section')

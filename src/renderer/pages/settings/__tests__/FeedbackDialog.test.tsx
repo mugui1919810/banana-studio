@@ -1,7 +1,6 @@
 import '@testing-library/jest-dom/vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { useState } from 'react'
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type * as CherryStudioUi from '@cherrystudio/ui'
@@ -10,8 +9,8 @@ import enUs from '@renderer/i18n/locales/en-us.json'
 const mocks = vi.hoisted(() => ({
   ipcRequest: vi.fn(),
   loggerError: vi.fn(),
-  openRoute: vi.fn(),
-  toastError: vi.fn()
+  toastError: vi.fn(),
+  toastInfo: vi.fn()
 }))
 
 vi.mock('@cherrystudio/ui', async (importOriginal) => importOriginal<typeof CherryStudioUi>())
@@ -26,12 +25,11 @@ vi.mock('@renderer/ipc', () => ({
   }
 }))
 
-vi.mock('@renderer/services/mainWindowNavigation', () => ({
-  openRoute: (...args: unknown[]) => mocks.openRoute(...args)
-}))
-
 vi.mock('@renderer/services/toast', () => ({
-  toast: { error: (...args: unknown[]) => mocks.toastError(...args) }
+  toast: {
+    error: (...args: unknown[]) => mocks.toastError(...args),
+    info: (...args: unknown[]) => mocks.toastInfo(...args)
+  }
 }))
 
 vi.mock('react-i18next', () => ({
@@ -40,12 +38,13 @@ vi.mock('react-i18next', () => ({
   })
 }))
 
-import { FEEDBACK_GITHUB_URL, FeedbackDialog, getFeedbackAgentRoute } from '../FeedbackDialog'
+vi.mock('@renderer/i18n/resolver', () => ({
+  default: {
+    t: (key: string) => (enUs as Record<string, string>)[key] ?? key
+  }
+}))
 
-function ControlledFeedbackDialog() {
-  const [open, setOpen] = useState(true)
-  return <FeedbackDialog open={open} onOpenChange={setOpen} />
-}
+import { FeedbackDialog } from '../FeedbackDialog'
 
 beforeAll(() => {
   globalThis.ResizeObserver = class {
@@ -71,51 +70,28 @@ describe('FeedbackDialog', () => {
     expect(agent.compareDocumentPosition(github)).toBe(Node.DOCUMENT_POSITION_FOLLOWING)
   })
 
-  it('creates an isolated feedback session before opening the Agent route', async () => {
-    render(<ControlledFeedbackDialog />)
-
-    await userEvent.setup().click(screen.getByRole('button', { name: /Feedback assistant/ }))
-
-    await waitFor(() => expect(mocks.ipcRequest).toHaveBeenCalledWith('ai.agent.support_session.create'))
-    await waitFor(() => expect(mocks.openRoute).toHaveBeenCalledWith(getFeedbackAgentRoute('feedback-session')))
-    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
-  })
-
-  it('reports feedback-session creation failures without opening an empty Agent route', async () => {
-    mocks.ipcRequest.mockRejectedValue(new Error('restore failed'))
+  it('shows the fork notice for the built-in feedback assistant', async () => {
     render(<FeedbackDialog open onOpenChange={vi.fn()} />)
 
     await userEvent.setup().click(screen.getByRole('button', { name: /Feedback assistant/ }))
 
-    await waitFor(() => expect(mocks.toastError).toHaveBeenCalledWith(enUs['settings.about.feedback.agent_error']))
-    expect(mocks.openRoute).not.toHaveBeenCalled()
+    await waitFor(() =>
+      expect(mocks.toastInfo).toHaveBeenCalledWith(enUs['fork.builtin_agent_unavailable'])
+    )
+    expect(mocks.ipcRequest).not.toHaveBeenCalled()
   })
 
-  it('opens the GitHub issue chooser', async () => {
+  it('shows the fork notice instead of opening the GitHub issue chooser', async () => {
     render(<FeedbackDialog open onOpenChange={vi.fn()} />)
 
     await userEvent.setup().click(screen.getByRole('button', { name: /GitHub Issue/ }))
 
     await waitFor(() =>
-      expect(mocks.ipcRequest).toHaveBeenCalledWith('system.shell.open_external_website', FEEDBACK_GITHUB_URL)
+      expect(mocks.toastInfo).toHaveBeenCalledWith(enUs['fork.external_link_unavailable'])
     )
-  })
-
-  it('closes before reporting GitHub issue chooser failures', async () => {
-    mocks.ipcRequest.mockImplementation((route: string) => {
-      if (route === 'system.shell.open_external_website') {
-        expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
-        return Promise.reject(new Error('open failed'))
-      }
-      return Promise.resolve({ sessionId: 'feedback-session' })
-    })
-    render(<ControlledFeedbackDialog />)
-
-    await userEvent.setup().click(screen.getByRole('button', { name: /GitHub Issue/ }))
-
-    await waitFor(() =>
-      expect(mocks.loggerError).toHaveBeenCalledWith('Failed to open GitHub issue chooser', expect.any(Error))
+    expect(mocks.ipcRequest).not.toHaveBeenCalledWith(
+      'system.shell.open_external_website',
+      expect.stringContaining('github.com/CherryHQ')
     )
-    expect(mocks.toastError).toHaveBeenCalledWith(enUs['settings.about.feedback.github.error'])
   })
 })

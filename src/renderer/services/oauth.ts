@@ -269,7 +269,7 @@ export const oauthWithPPIO = async (setKey) => {
 }
 
 export const oauthWith302AI = async (setKey) => {
-  const authUrl = 'https://dash.302.ai/sso/login?app=cherry-ai.com&name=Cherry%20Studio'
+  const authUrl = 'https://dash.302.ai/sso/login?app=cherry-ai.com&name=Banana%20Studio'
 
   startPopupMessageOAuth({
     authUrl,
@@ -292,27 +292,6 @@ export const oauthWithAiOnly = async (setKey) => {
     setKey,
     onError: (error) => logger.error('[oauthWithAiOnly] error', error as Error)
   })
-}
-
-export interface NewApiOAuthConfig {
-  oauthServer: string
-  apiHost?: string
-  requestId?: string
-}
-
-/** CherryIN authorization and HTTP callback are handled in the main process. */
-export const oauthWithCherryIn = async (
-  setKey: (key: string) => void | Promise<void>,
-  config: NewApiOAuthConfig
-): Promise<string> => {
-  const result = await ipcApi.request('cherryin.sign_in', {
-    requestId: config.requestId ?? crypto.randomUUID(),
-    oauthServer: config.oauthServer,
-    apiHost: config.apiHost
-  })
-  if (!result.apiKeys) throw new Error('No API keys received')
-  await setKey(result.apiKeys)
-  return result.apiKeys
 }
 
 export const oauthWithTokenDance = async (setKey) => {

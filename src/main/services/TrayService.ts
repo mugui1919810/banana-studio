@@ -12,6 +12,7 @@ import { getNormalizedExecutablePath } from '@main/core/preboot/userDataLocation
 import { t } from '@main/i18n'
 import { getApplicationId } from '@main/utils/appEdition'
 import { isRunningWindowsExecutableSigned } from '@main/utils/windowsExecutableSignature'
+import { APP_NAME } from '@shared/utils/constants'
 
 import icon from '../../../build/tray_icon.png?asset'
 import iconDark from '../../../build/tray_icon_dark.png?asset'
@@ -79,7 +80,7 @@ export class TrayService extends BaseService implements Activatable {
       this.tray.setContextMenu(this.contextMenu)
     }
 
-    this.tray.setToolTip('Cherry Studio')
+    this.tray.setToolTip(APP_NAME)
 
     this.tray.on('right-click', () => {
       if (this.contextMenu) {

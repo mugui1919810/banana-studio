@@ -9,6 +9,7 @@ import { BaseService, Injectable, Phase, ServicePhase } from '@main/core/lifecyc
 import { isDev, isLinux, isMac, isPortable, isWin } from '@main/core/platform'
 import { atomicWriteFile, ensureDir, remove } from '@main/utils/file'
 import { AbsoluteFilePathSchema } from '@shared/types/file'
+import { APP_NAME } from '@shared/utils/constants'
 
 const logger = loggerService.withContext('AppService')
 
@@ -86,7 +87,7 @@ export class AppService extends BaseService {
         // Create desktop file content
         const desktopContent = `[Desktop Entry]
   Type=Application
-  Name=Cherry Studio
+  Name=${APP_NAME}
   Comment=A powerful AI assistant for producer.
   Exec=${executablePath}
   Icon=cherrystudio

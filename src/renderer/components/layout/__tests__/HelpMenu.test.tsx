@@ -5,6 +5,7 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type * as CherryStudioUi from '@cherrystudio/ui'
+import { toast } from '@renderer/services/toast'
 
 const mocks = vi.hoisted(() => ({
   language: 'en-US',
@@ -93,7 +94,7 @@ describe('HelpMenu', () => {
     ).toEqual(['help.whats_new', 'help.guide', 'Report a problem', 'help.feedback', 'System diagnostics'])
 
     await user.click(screen.getByRole('button', { name: 'help.whats_new' }))
-    await waitFor(() => expect(mocks.openReleaseNotes).toHaveBeenCalledOnce())
+    await waitFor(() => expect(toast.info).toHaveBeenCalledWith('fork.external_link_unavailable'))
   })
 
   it('closes the help menu before opening the report panel', async () => {
@@ -124,26 +125,14 @@ describe('HelpMenu', () => {
     expect(onOverlayOpenChange).toHaveBeenLastCalledWith(false)
   })
 
-  it.each([
-    ['zh-CN', 'https://docs.cherryai.com.cn/'],
-    ['zh-TW', 'https://docs.cherryai.com.cn/'],
-    ['en-US', 'https://docs.cherryai.com.cn/docs/en-us']
-  ])('opens the language-specific guide in app content for %s', async (language, expectedUrl) => {
-    mocks.language = language
+  it('shows the fork notice instead of opening the Cherry guide', async () => {
     render(<HelpMenu layout="full" onFeedbackClick={mocks.openFeedback} />)
     const user = await openMenu()
 
     await user.click(screen.getByRole('button', { name: 'help.guide' }))
 
-    await waitFor(() =>
-      expect(mocks.openSmartMiniApp).toHaveBeenCalledWith(
-        expect.objectContaining({
-          appId: 'cherrystudio-guide',
-          name: 'help.guide',
-          url: expectedUrl
-        })
-      )
-    )
+    await waitFor(() => expect(toast.info).toHaveBeenCalledWith('fork.external_link_unavailable'))
+    expect(mocks.openSmartMiniApp).not.toHaveBeenCalled()
   })
 
   it('requests the feedback dialog from the secondary menu action', async () => {
@@ -173,6 +162,6 @@ describe('HelpMenu', () => {
     expect(firstAction).toHaveFocus()
     await user.keyboard('{Enter}')
 
-    await waitFor(() => expect(mocks.openReleaseNotes).toHaveBeenCalledOnce())
+    await waitFor(() => expect(toast.info).toHaveBeenCalledWith('fork.external_link_unavailable'))
   })
 })

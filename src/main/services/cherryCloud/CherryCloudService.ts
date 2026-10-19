@@ -96,7 +96,7 @@ export class CherryCloudLoginUnavailableError extends Error {
 
 export class CherryCloudUpgradeRequiredError extends Error {
   constructor() {
-    super('Update Cherry Studio to sign in to Cherry Cloud')
+    super('Update Banana Studio to sign in to Cherry Cloud')
     this.name = 'CherryCloudUpgradeRequiredError'
   }
 }

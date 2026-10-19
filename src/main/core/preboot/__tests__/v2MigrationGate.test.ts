@@ -369,7 +369,7 @@ describe('runV2MigrationGate', () => {
       expect(showMessageBoxMock).toHaveBeenCalledTimes(1)
       expect(showMessageBoxMock.mock.calls[0][0]).toMatchObject({
         title: '数据库不可用',
-        message: 'Cherry Studio 无法访问本地数据库。',
+        message: 'Banana Studio 无法访问本地数据库。',
         detail: '请检查数据存储位置是否可用且可写，并确保磁盘有足够的可用空间，然后重试。',
         buttons: ['重试', '退出'],
         defaultId: 0,

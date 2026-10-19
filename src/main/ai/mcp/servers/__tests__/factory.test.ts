@@ -78,14 +78,14 @@ describe('resolveBuiltinExternalMcpServer', () => {
     ).toMatchObject({
       type: 'streamableHttp',
       baseUrl: 'https://flomoapp.com/mcp',
-      headers: { Existing: 'value', APP: 'Cherry Studio' }
+      headers: { Existing: 'value', APP: 'Banana Studio' }
     })
     expect(
       resolveBuiltinExternalMcpServer(server({ name: BuiltinMcpServerNames.nowledgeMem, installSource: 'builtin' }))
     ).toMatchObject({
       type: 'streamableHttp',
       baseUrl: 'http://127.0.0.1:14242/mcp',
-      headers: { APP: 'Cherry Studio' }
+      headers: { APP: 'Banana Studio' }
     })
   })
 

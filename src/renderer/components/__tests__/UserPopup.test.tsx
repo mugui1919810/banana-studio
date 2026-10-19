@@ -6,6 +6,7 @@ import type { ReactNode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { POPUP_EXIT_MS, popupService } from '@renderer/services/popup'
+import { toast } from '@renderer/services/toast'
 import type * as ImageUtils from '@renderer/utils/image'
 
 const mocks = vi.hoisted(() => ({
@@ -306,29 +307,19 @@ describe('UserPopup', () => {
     })
   })
 
-  it('starts and cancels Cherry Studio browser authorization', async () => {
+  it('shows the fork notice instead of starting Cherry Cloud authorization', async () => {
     const user = userEvent.setup()
     mocks.ipcRequest.mockImplementation(async (route: string) => {
       if (route === 'cherry_cloud.status.get') return { phase: 'signed-out', displayName: null }
-      if (route === 'cherry_cloud.login.start') return { phase: 'authorizing', displayName: null }
-      if (route === 'cherry_cloud.login.cancel') return { phase: 'signed-out', displayName: null }
       return undefined
     })
     showUserPopup()
 
-    const loginButton = await screen.findByRole('button', { name: 'settings.provider.cherry_cloud.login' })
+    const loginButton = await screen.findByRole('button', { name: 'fork.login_closed' })
     await user.click(loginButton)
 
-    expect(mocks.ipcRequest).toHaveBeenCalledWith('cherry_cloud.login.start')
-    expect(screen.getByRole('button', { name: 'settings.provider.cherry_cloud.signing_in' })).toHaveAttribute(
-      'aria-busy',
-      'true'
-    )
-
-    await user.click(screen.getByRole('button', { name: 'common.cancel' }))
-
-    expect(mocks.ipcRequest).toHaveBeenCalledWith('cherry_cloud.login.cancel')
-    expect(await screen.findByRole('button', { name: 'settings.provider.cherry_cloud.login' })).toBeEnabled()
+    expect(toast.info).toHaveBeenCalledWith('fork.login_closed')
+    expect(mocks.ipcRequest).not.toHaveBeenCalledWith('cherry_cloud.login.start')
   })
 
   it('hides the Cherry Cloud login action in the global edition', async () => {
@@ -337,7 +328,7 @@ describe('UserPopup', () => {
 
     await waitFor(() => expect(mocks.ipcRequest).toHaveBeenCalledWith('cherry_cloud.status.get'))
 
-    expect(screen.queryByRole('button', { name: 'settings.provider.cherry_cloud.login' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'fork.login_closed' })).not.toBeInTheDocument()
   })
 
   it('revokes the current Cherry Cloud session and returns to the login action', async () => {
@@ -356,7 +347,7 @@ describe('UserPopup', () => {
     await user.click(logoutButton)
 
     expect(mocks.ipcRequest).toHaveBeenCalledWith('cherry_cloud.session.revoke')
-    expect(await screen.findByRole('button', { name: 'settings.provider.cherry_cloud.login' })).toBeEnabled()
+    expect(await screen.findByRole('button', { name: 'fork.login_closed' })).toBeEnabled()
   })
 
   it('offers a retry when the Cloud account status cannot be loaded', async () => {

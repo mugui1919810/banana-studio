@@ -170,7 +170,7 @@ export function buildApp({
     .get(
       '/',
       () => ({
-        name: 'Cherry Studio API',
+        name: 'Banana Studio API',
         version: '1.0.0',
         endpoints: {
           health: 'GET /health',

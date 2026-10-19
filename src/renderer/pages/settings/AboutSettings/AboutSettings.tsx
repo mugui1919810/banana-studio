@@ -29,9 +29,7 @@ import {
   SettingsContentColumn,
   SettingTitle
 } from '@renderer/components/SettingsPrimitives'
-import UpdateDialogPopup from '@renderer/components/UpdateDialogPopup'
 import { useAppUpdateState } from '@renderer/hooks/useAppUpdateState'
-import { useOpenReleaseNotes } from '@renderer/hooks/useOpenReleaseNotes'
 import { useTheme } from '@renderer/hooks/useTheme'
 import i18n from '@renderer/i18n/resolver'
 import { ipcApi } from '@renderer/ipc'
@@ -51,7 +49,6 @@ const AboutSettings: FC = () => {
   const [feedbackOpen, setFeedbackOpen] = useState(false)
   const { t } = useTranslation()
   const { theme } = useTheme()
-  const showReleases = useOpenReleaseNotes()
   const location = useLocation()
   const navigate = useNavigate()
   const search = useSearch({ strict: false }) as Partial<Record<typeof DOCTOR_OPEN_QUERY_PARAM, DoctorPanel>>
@@ -81,26 +78,8 @@ const AboutSettings: FC = () => {
   }, [location.pathname, navigate, search])
 
   const onCheckUpdate = debounce(
-    async () => {
-      if (appUpdateState.checking || appUpdateState.downloading) {
-        return
-      }
-
-      if (appUpdateState.downloaded) {
-        void UpdateDialogPopup.show({ releaseInfo: appUpdateState.info || null })
-        return
-      }
-
-      updateAppUpdateState({ checking: true, manualCheck: true })
-
-      try {
-        await ipcApi.request('app.updater.check_for_update')
-      } catch {
-        updateAppUpdateState({ manualCheck: false })
-        toast.error(t('settings.about.updateError'))
-      }
-
-      updateAppUpdateState({ checking: false })
+    () => {
+      toast.info(t('fork.external_link_unavailable'))
     },
     2000,
     { leading: true, trailing: false }
@@ -110,9 +89,13 @@ const AboutSettings: FC = () => {
     void openExternalWebsite(url)
   }
 
+  const showForkNotice = () => {
+    toast.info(t('fork.external_link_unavailable'))
+  }
+
   const mailto = async () => {
     const email = 'support@cherry-ai.com'
-    const subject = 'Cherry Studio Feedback'
+    const subject = 'Banana Studio Feedback'
     const version = (await ipcApi.request('app.get_info')).version
     const platform = window.electron.process.platform
     const url = `mailto:${email}?subject=${subject}&body=%0A%0AVersion: ${version} | Platform: ${platform}`
@@ -247,12 +230,12 @@ const AboutSettings: FC = () => {
             </button>
 
             <div className="flex min-h-18 flex-col items-start justify-center">
-              <div className="mb-1 text-lg font-bold text-foreground">Cherry Studio</div>
+              <div className="mb-1 text-lg font-bold text-foreground">Banana Studio</div>
               <div className="text-muted-foreground text-sm">{t('settings.about.description')}</div>
               <button
                 type="button"
                 aria-label={t('settings.about.releases.title')}
-                onClick={() => onOpenWebsite('https://github.com/CherryHQ/cherry-studio/releases')}
+                onClick={showForkNotice}
                 className="mt-1.5">
                 <Badge className="cursor-pointer rounded-md border-primary/20 bg-primary/10 px-1.5 py-0 text-[11px] leading-4 text-primary transition-colors hover:bg-primary/15">
                   v{version}
@@ -349,7 +332,7 @@ const AboutSettings: FC = () => {
           icon={<Rss className="size-4.5" />}
           title={t('settings.about.releases.title')}
           actionLabel={t('settings.about.releases.button')}
-          onAction={showReleases}
+          onAction={showForkNotice}
         />
         <Divider className="my-3" />
         <AboutActionRow

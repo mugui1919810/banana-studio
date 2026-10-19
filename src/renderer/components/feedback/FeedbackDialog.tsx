@@ -16,8 +16,6 @@ import {
   ItemTitle
 } from '@cherrystudio/ui'
 import { loggerService } from '@logger'
-import { ipcApi } from '@renderer/ipc'
-import { openRoute } from '@renderer/services/mainWindowNavigation'
 import { toast } from '@renderer/services/toast'
 import { openExternalWebsite } from '@renderer/services/website'
 
@@ -74,14 +72,8 @@ export function FeedbackDialog({ open, onOpenChange }: FeedbackDialogProps) {
     }, 0)
   }
 
-  const openAgentFeedback = async () => {
-    try {
-      const { sessionId } = await ipcApi.request('ai.agent.support_session.create')
-      openRoute(getFeedbackAgentRoute(sessionId))
-    } catch (error) {
-      logger.error('Failed to create Cherry Support feedback session', error as Error)
-      toast.error(t('settings.about.feedback.agent_error'))
-    }
+  const openAgentFeedback = () => {
+    toast.info(t('fork.builtin_agent_unavailable'))
   }
 
   const openGitHubIssue = async () => {

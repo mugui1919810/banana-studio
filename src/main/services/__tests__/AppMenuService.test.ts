@@ -173,7 +173,7 @@ describe('AppMenuService', () => {
     const quitItem = (latestTemplate()[0].submenu as MenuItemConstructorOptions[]).find((item) => item.role === 'quit')
 
     expect(copyItem).toMatchObject({ role: 'copy', label: 'Copy' })
-    expect(quitItem).toMatchObject({ role: 'quit', label: 'Quit Cherry Studio' })
+    expect(quitItem).toMatchObject({ role: 'quit', label: 'Quit Banana Studio' })
   })
 
   it('moves the window-close accelerator off CommandOrControl+W so the tab bar can claim it', async () => {

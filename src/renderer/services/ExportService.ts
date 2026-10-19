@@ -1366,7 +1366,7 @@ export const exportMarkdownToJoplin = async (
       body: JSON.stringify({
         title: title,
         body: content,
-        source: 'Cherry Studio'
+        source: 'Banana Studio'
       })
     })
 

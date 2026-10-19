@@ -20,14 +20,14 @@ describe('buildOpenCodeConfig', () => {
       },
       { apiKey: 'sk-test', baseUrl: 'https://api.example.com/v1', model: 'deepseek-chat' },
       {
-        providerHeaders: { 'X-Title': 'Cherry Studio', invalid: 42 }
+        providerHeaders: { 'X-Title': 'Banana Studio', invalid: 42 }
       }
     )
 
     expect(result.provider['cherry-DeepSeek'].options).toEqual({
       apiKey: 'sk-test',
       baseURL: 'https://api.example.com/v1',
-      headers: { 'X-Title': 'Cherry Studio' }
+      headers: { 'X-Title': 'Banana Studio' }
     })
   })
 
@@ -118,7 +118,7 @@ describe('Pi config builders', () => {
         apiKey: 'sk-test',
         baseUrl: 'https://api.example.com/v1',
         contextWindow: 128000,
-        headers: { 'X-Title': 'Cherry Studio' },
+        headers: { 'X-Title': 'Banana Studio' },
         input: ['text', 'image'],
         maxTokens: 8192,
         model: 'model-id',
@@ -136,7 +136,7 @@ describe('Pi config builders', () => {
           baseUrl: 'https://api.example.com/v1',
           api: 'openai-completions',
           apiKey: 'sk-test',
-          headers: { 'X-Title': 'Cherry Studio' },
+          headers: { 'X-Title': 'Banana Studio' },
           models: [
             {
               id: 'model-id',

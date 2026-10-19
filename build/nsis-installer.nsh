@@ -115,9 +115,7 @@
       This installer is not compatible with your system architecture.$\r$\n\
       Your system: $1$\r$\n\
       App architecture: $3$\r$\n$\r$\n\
-      Please download the correct version from:$\r$\n\
-      https://www.cherry-ai.com/"
-    ExecShell "open" "https://www.cherry-ai.com/"
+      Please use the official release to get the correct version."
     Abort
   ${EndIf}
 

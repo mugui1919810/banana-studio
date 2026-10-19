@@ -199,7 +199,7 @@ const CROSS_CUTTING_TOOL_GUARD_RULES: readonly ToolGuardRule[] = [
     headless: {
       predicate: 'turn-headless',
       reason:
-        'Headless channel or scheduled turns cannot mutate agent configuration. Ask the user to make this change in Cherry Studio.'
+        'Headless channel or scheduled turns cannot mutate agent configuration. Ask the user to make this change in Banana Studio.'
     }
   },
   {

@@ -433,36 +433,24 @@ describe('MigrationIpcHandler', () => {
   })
 
   describe('v1 download page', () => {
-    it.each([
-      ['zh-CN', 'https://cherryai.com.cn/download/v1'],
-      ['en-US', 'https://cherryai.com/download/v1']
-    ])('opens the site matching the %s wizard language', async (language, url) => {
-      await expect(invoke(MigrationIpcChannels.OpenDownloadPage, language)).resolves.toBe(true)
-      expect(shell.openExternal).toHaveBeenCalledWith(url)
-    })
+    it('shows the fork notice instead of opening the upstream download page', async () => {
+      await expect(invoke(MigrationIpcChannels.OpenDownloadPage, 'zh-CN')).resolves.toBe(true)
 
-    // Any Chinese variant reads the China site, matching the window's own `zh` language test.
-    it.each(['zh', 'zh-TW', 'ZH-HK'])('treats %s as Chinese', async (language) => {
-      await invoke(MigrationIpcChannels.OpenDownloadPage, language)
-
-      expect(shell.openExternal).toHaveBeenCalledWith('https://cherryai.com.cn/download/v1')
-    })
-
-    // A missing or malformed language must not strand the user on an error.
-    it.each([undefined, null, 42])('falls back to the global site for %s', async (language) => {
-      await expect(invoke(MigrationIpcChannels.OpenDownloadPage, language)).resolves.toBe(true)
-      expect(shell.openExternal).toHaveBeenCalledWith('https://cherryai.com/download/v1')
+      expect(dialog.showMessageBox).toHaveBeenCalledWith({
+        type: 'info',
+        message: expect.stringMatching(/official release|官方release/)
+      })
     })
 
     it('rejects an untrusted sender', async () => {
       diagnosticMocks.validateSender.mockReturnValue(false)
 
       await expect(invoke(MigrationIpcChannels.OpenDownloadPage, 'zh-CN')).rejects.toThrow('Unauthorized')
-      expect(shell.openExternal).not.toHaveBeenCalled()
+      expect(dialog.showMessageBox).not.toHaveBeenCalled()
     })
 
-    it('returns false when the shell cannot open the page', async () => {
-      vi.mocked(shell.openExternal).mockRejectedValueOnce(new Error('no browser'))
+    it('returns false when the notice cannot be shown', async () => {
+      vi.mocked(dialog.showMessageBox).mockRejectedValueOnce(new Error('no dialog'))
 
       await expect(invoke(MigrationIpcChannels.OpenDownloadPage, 'en-US')).resolves.toBe(false)
     })

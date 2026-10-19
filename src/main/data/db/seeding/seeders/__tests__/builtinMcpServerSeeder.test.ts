@@ -27,7 +27,7 @@ describe('BuiltinMcpServerSeeder', () => {
     const row = await rowFor(BuiltinMcpServerNames.flomo)
     expect(row.type).toBe('streamableHttp')
     expect(row.baseUrl).toBe('https://flomoapp.com/mcp')
-    expect(row.headers).toEqual({ APP: 'Cherry Studio' })
+    expect(row.headers).toEqual({ APP: 'Banana Studio' })
   })
 
   it('turns an installed in-memory mcp-auto-install row into the npx process it really is', async () => {

@@ -25,7 +25,7 @@ export const zhCN = {
   'migration.completed.duration_label': '迁移耗时',
   'migration.completed.items_label': '迁移项',
   'migration.completed.steps_label': '步骤已完成',
-  'migration.completed.title': '欢迎来到 Cherry Studio V2',
+  'migration.completed.title': '欢迎来到 Banana Studio V2',
   'migration.completed.warning_copy': '复制全部提示',
   'migration.completed.warning_copy_failed': '无法复制迁移提示',
   'migration.completed.warning_copy_success': '迁移提示已复制',
@@ -35,13 +35,13 @@ export const zhCN = {
   'migration.diagnostics.copy_failed': '问题反馈邮箱复制失败',
   'migration.diagnostics.copy_success': '问题反馈邮箱已复制',
   'migration.diagnostics.export_description':
-    '诊断包包含迁移错误、系统信息和可用的应用日志。日志可能包含文件路径、错误堆栈、用户内容或凭据；文件只会保存到本地，不会自动上传，请仅发送给 Cherry Studio 支持团队。',
+    '诊断包包含迁移错误、系统信息和可用的应用日志。日志可能包含文件路径、错误堆栈、用户内容或凭据；文件只会保存到本地，不会自动上传，请仅发送给 Banana Studio 支持团队。',
   'migration.diagnostics.logs_not_included': '未能加入应用日志，当前诊断包仅包含系统信息。',
   'migration.diagnostics.open_folder': '打开文件所在位置',
   'migration.diagnostics.open_folder_failed': '无法打开文件所在位置',
   'migration.diagnostics.open_from_error': '导出此错误的诊断包',
   'migration.diagnostics.privacy':
-    '应用日志可能包含文件路径、错误堆栈、用户内容或凭据，请勿分享到公开渠道或提供给 Cherry Studio 支持团队之外的人员。',
+    '应用日志可能包含文件路径、错误堆栈、用户内容或凭据，请勿分享到公开渠道或提供给 Banana Studio 支持团队之外的人员。',
   'migration.diagnostics.save': '保存诊断包',
   'migration.diagnostics.save_failed': '诊断包保存失败',
   'migration.diagnostics.saved_local': '诊断包已保存到本地且未自动上传，请发送至问题反馈邮箱以协助排查。',
@@ -64,7 +64,7 @@ export const zhCN = {
   'migration.introduction.features.migration.title': '需要迁移数据',
   'migration.introduction.features.safety.description': '旧版数据会保留在磁盘中，迁移失败后可重新尝试。',
   'migration.introduction.features.safety.title': '安全且可重试',
-  'migration.introduction.subtitle': 'Cherry Studio V2 · 全新数据架构',
+  'migration.introduction.subtitle': 'Banana Studio V2 · 全新数据架构',
   'migration.introduction.title': '将数据迁移到新的架构中',
   'migration.language.select': '切换语言',
   'migration.migration.do_not_close': '迁移进行中，请勿关闭应用…',
@@ -130,7 +130,7 @@ export const zhCN = {
   'migration.version_incompatible.no_version_log':
     '无法确定您之前使用的版本。请先安装 {{requiredVersion}} 版本并运行一次，然后再安装此版本进行数据迁移。',
   'migration.version_incompatible.preamble':
-    'Cherry Studio 对数据存储进行了重大重构，为了保证旧数据的安全迁移，我们对升级顺序有严格要求。',
+    'Banana Studio 对数据存储进行了重大重构，为了保证旧数据的安全迁移，我们对升级顺序有严格要求。',
   'migration.version_incompatible.title': '版本升级提示',
   'migration.version_incompatible.v1_too_old':
     '您之前的版本（{{previousVersion}}）过旧，无法直接迁移。请先升级到 {{requiredVersion}} 版本并运行一次，然后再安装此版本。',
@@ -175,7 +175,7 @@ export const enUS = {
   'migration.completed.duration_label': 'Migration time',
   'migration.completed.items_label': 'Migration items',
   'migration.completed.steps_label': 'Steps completed',
-  'migration.completed.title': 'Welcome to Cherry Studio V2',
+  'migration.completed.title': 'Welcome to Banana Studio V2',
   'migration.completed.warning_copy': 'Copy all notices',
   'migration.completed.warning_copy_failed': 'Failed to copy migration notices',
   'migration.completed.warning_copy_success': 'Migration notices copied',
@@ -185,14 +185,14 @@ export const enUS = {
   'migration.diagnostics.copy_failed': 'Failed to copy feedback email',
   'migration.diagnostics.copy_success': 'Feedback email copied',
   'migration.diagnostics.export_description':
-    'The bundle includes migration errors, system information, and available application logs. Logs may contain file paths, error stacks, user content, or credentials. It is saved locally and never uploaded automatically; share it only with Cherry Studio support.',
+    'The bundle includes migration errors, system information, and available application logs. Logs may contain file paths, error stacks, user content, or credentials. It is saved locally and never uploaded automatically; share it only with Banana Studio support.',
   'migration.diagnostics.logs_not_included':
     'Application logs could not be included. This diagnostic bundle contains only system information.',
   'migration.diagnostics.open_folder': 'Open file location',
   'migration.diagnostics.open_folder_failed': 'Could not open file location',
   'migration.diagnostics.open_from_error': 'Export a diagnostic bundle for this error',
   'migration.diagnostics.privacy':
-    'Application logs may contain file paths, error stacks, user content, or credentials. Do not share them publicly or with anyone outside the Cherry Studio support team.',
+    'Application logs may contain file paths, error stacks, user content, or credentials. Do not share them publicly or with anyone outside the Banana Studio support team.',
   'migration.diagnostics.save': 'Save diagnostic bundle',
   'migration.diagnostics.save_failed': 'Could not save diagnostic bundle',
   'migration.diagnostics.saved_local':
@@ -218,7 +218,7 @@ export const enUS = {
   'migration.introduction.features.safety.description':
     'Your legacy data stays on disk, so you can retry if a migration fails.',
   'migration.introduction.features.safety.title': 'Safe and Retryable',
-  'migration.introduction.subtitle': 'Cherry Studio V2 · New Data Architecture',
+  'migration.introduction.subtitle': 'Banana Studio V2 · New Data Architecture',
   'migration.introduction.title': 'Migrate Data to New Architecture',
   'migration.language.select': 'Switch language',
   'migration.migration.do_not_close': 'Migration in progress, please do not close the app…',
@@ -289,7 +289,7 @@ export const enUS = {
   'migration.version_incompatible.no_version_log':
     'Cannot determine your previous version. Please install version {{requiredVersion}} first and run it at least once, then install this version to complete the data migration.',
   'migration.version_incompatible.preamble':
-    'Cherry Studio has undergone a major data storage refactoring. To ensure safe migration of your data, we have strict requirements on the upgrade order.',
+    'Banana Studio has undergone a major data storage refactoring. To ensure safe migration of your data, we have strict requirements on the upgrade order.',
   'migration.version_incompatible.title': 'Version Upgrade Required',
   'migration.version_incompatible.v1_too_old':
     'Your previous version ({{previousVersion}}) is too old to migrate directly. Please install version {{requiredVersion}} first, then install this version.',

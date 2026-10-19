@@ -19,6 +19,7 @@ const mocks = vi.hoisted(() => ({
   },
   request: vi.fn(),
   toastError: vi.fn(),
+  toastInfo: vi.fn(),
   toastSuccess: vi.fn()
 }))
 
@@ -51,8 +52,13 @@ vi.mock('@renderer/services/LoggerService', () => ({
 vi.mock('@renderer/services/toast', () => ({
   toast: {
     error: (...args: unknown[]) => mocks.toastError(...args),
+    info: (...args: unknown[]) => mocks.toastInfo(...args),
     success: (...args: unknown[]) => mocks.toastSuccess(...args)
   }
+}))
+
+vi.mock('@renderer/i18n/resolver', () => ({
+  default: { t: (key: string) => key }
 }))
 
 vi.mock('react-i18next', () => ({
@@ -538,7 +544,11 @@ describe('useDoctorController', () => {
     await act(async () => result.current.executeAction('config-hardware-acceleration', { kind: 'relaunch' }))
 
     expect(onNavigate).toHaveBeenCalledWith('/settings/provider')
-    expect(mocks.request).toHaveBeenCalledWith('system.shell.open_external_website', 'https://cherry-ai.com/status')
+    expect(mocks.toastInfo).toHaveBeenCalledWith('fork.external_link_unavailable')
+    expect(mocks.request).not.toHaveBeenCalledWith(
+      'system.shell.open_external_website',
+      'https://cherry-ai.com/status'
+    )
     expect(mocks.request).toHaveBeenCalledWith('app.relaunch')
   })
 })

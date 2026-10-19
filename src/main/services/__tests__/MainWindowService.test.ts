@@ -360,11 +360,11 @@ describe('MainWindowService', () => {
     })
 
     it.each([
-      ['cn', 'en-US', 'https://cherryai.com.cn/download'],
-      ['cn', 'zh-CN', 'https://cherryai.com.cn/download'],
-      ['global', 'zh-CN', 'https://cherryai.com/download'],
-      ['global', 'en-US', 'https://cherryai.com/download']
-    ] as const)('opens the %s download page with %s UI only after confirmation', async (edition, language, url) => {
+      ['cn', 'en-US'],
+      ['cn', 'zh-CN'],
+      ['global', 'zh-CN'],
+      ['global', 'en-US']
+    ] as const)('shows the fork notice instead of the %s download page with %s UI', async (edition, language) => {
       vi.mocked(getAppEdition).mockReturnValue(edition)
       prefValues['app.language'] = language
       vi.mocked(dialog.showMessageBox).mockResolvedValue({ response: 0, checkboxChecked: false })
@@ -373,7 +373,16 @@ describe('MainWindowService', () => {
       expect(shell.openExternal).not.toHaveBeenCalled()
       win.emit('show')
 
-      await vi.waitFor(() => expect(shell.openExternal).toHaveBeenCalledWith(url))
+      await vi.waitFor(() =>
+        expect(dialog.showMessageBox).toHaveBeenLastCalledWith(
+          win,
+          expect.objectContaining({
+            type: 'info',
+            message: expect.stringMatching(/official release|官方release/)
+          })
+        )
+      )
+      expect(shell.openExternal).not.toHaveBeenCalled()
       expect(dialog.showMessageBox).toHaveBeenCalledWith(
         win,
         expect.objectContaining({ type: 'warning', cancelId: 1, detail: expect.stringContaining('Apple') })

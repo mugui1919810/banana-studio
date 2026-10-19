@@ -1003,7 +1003,7 @@ describe('writeCliConfigDraft', () => {
       const providerWithRequestOptions = {
         ...openaiCompatProvider,
         settings: {
-          extraHeaders: { 'HTTP-Referer': 'https://cherry-ai.com', 'X-Title': 'Cherry Studio' }
+          extraHeaders: { 'HTTP-Referer': 'https://cherry-ai.com', 'X-Title': 'Banana Studio' }
         }
       } as Provider
       mockGet({
@@ -1020,7 +1020,7 @@ describe('writeCliConfigDraft', () => {
       const options = JSON.parse(opencodeWrite().content).provider['cherry-DeepSeek'].options
       expect(options.headers).toEqual({
         'HTTP-Referer': 'https://cherry-ai.com',
-        'X-Title': 'Cherry Studio'
+        'X-Title': 'Banana Studio'
       })
     })
 

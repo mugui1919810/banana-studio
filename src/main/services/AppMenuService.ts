@@ -5,6 +5,7 @@ import { loggerService } from '@logger'
 import { BaseService, Conditional, Injectable, onPlatform, Phase, ServicePhase } from '@main/core/lifecycle'
 import { WindowType } from '@main/core/window/types'
 import { t } from '@main/i18n'
+import { APP_NAME } from '@shared/utils/constants'
 import { openSettingsInMainWindow } from '@main/services/mainWindowNavigation'
 import type { NativeCommandMenuItem, NativeMenuItem } from '@main/services/menu/adapters/nativeMenuAdapter'
 import { toElectronMenuTemplate } from '@main/services/menu/adapters/nativeMenuAdapter'
@@ -102,11 +103,11 @@ export class AppMenuService extends BaseService {
     const items: NativeMenuItem[] = [
       {
         type: 'submenu',
-        label: app.name,
+        label: APP_NAME,
         children: [
           {
             type: 'custom',
-            label: t('appMenu.about') + ' ' + app.name,
+            label: t('appMenu.about') + ' ' + APP_NAME,
             click: () => {
               openSettingsInMainWindow('/settings/about')
             }
@@ -115,11 +116,11 @@ export class AppMenuService extends BaseService {
           { type: 'separator' },
           { type: 'role', role: 'services', label: t('appMenu.services') },
           { type: 'separator' },
-          { type: 'role', role: 'hide', label: `${t('appMenu.hide')} ${app.name}` },
+          { type: 'role', role: 'hide', label: `${t('appMenu.hide')} ${APP_NAME}` },
           { type: 'role', role: 'hideOthers', label: t('appMenu.hideOthers') },
           { type: 'role', role: 'unhide', label: t('appMenu.unhide') },
           { type: 'separator' },
-          { type: 'role', role: 'quit', label: `${t('appMenu.quit')} ${app.name}` }
+          { type: 'role', role: 'quit', label: `${t('appMenu.quit')} ${APP_NAME}` }
         ]
       },
       {

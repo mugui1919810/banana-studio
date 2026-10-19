@@ -9,7 +9,7 @@ import type { PendingRelocation } from './types'
 
 // Chromium writes these marker files into an actively used profile directory.
 // Their presence in a proposed target means another (possibly still running)
-// Cherry Studio instance owns that directory, so relocation must not touch it.
+// Banana Studio instance owns that directory, so relocation must not touch it.
 const ACTIVE_PROFILE_MARKERS = ['SingletonLock', 'SingletonSocket'] as const
 
 export class RelocationValidationError extends Error {
@@ -92,7 +92,7 @@ export function assertRelocationPaths(
     if (ACTIVE_PROFILE_MARKERS.some((marker) => entries.includes(marker))) {
       invalid(
         'target_in_use',
-        `target appears to be an active userData directory; close other Cherry Studio instances, or remove stale SingletonLock and SingletonSocket markers if none are running: ${toValue}`
+        `target appears to be an active userData directory; close other Banana Studio instances, or remove stale SingletonLock and SingletonSocket markers if none are running: ${toValue}`
       )
     }
   }

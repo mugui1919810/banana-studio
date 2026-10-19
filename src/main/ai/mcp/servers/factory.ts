@@ -26,14 +26,14 @@ export function resolveBuiltinExternalMcpServer(server: McpServer): McpServer {
         ...server,
         type: 'streamableHttp',
         baseUrl: 'http://127.0.0.1:14242/mcp',
-        headers: { ...server.headers, APP: 'Cherry Studio' }
+        headers: { ...server.headers, APP: 'Banana Studio' }
       }
     case BuiltinMcpServerNames.flomo:
       return {
         ...server,
         type: 'streamableHttp',
         baseUrl: 'https://flomoapp.com/mcp',
-        headers: { ...server.headers, APP: 'Cherry Studio' }
+        headers: { ...server.headers, APP: 'Banana Studio' }
       }
     case BuiltinMcpServerNames.qveris: {
       const apiKey = server.env?.QVERIS_API_KEY?.trim()

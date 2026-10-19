@@ -3,6 +3,8 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { toast } from '@renderer/services/toast'
+
 const mocks = vi.hoisted(() => ({
   navigate: vi.fn(),
   request: vi.fn(),
@@ -58,6 +60,10 @@ vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key: string) => (key === 'settings.doctor.entry.title' ? 'System diagnostics' : key)
   })
+}))
+
+vi.mock('@renderer/i18n/resolver', () => ({
+  default: { language: 'en-US', t: (key: string) => key }
 }))
 
 vi.mock('streamdown', () => ({
@@ -154,13 +160,15 @@ describe('AboutSettings repository controls accessibility', () => {
 
     const repositoryButtons = screen.getAllByRole('button', { name: 'settings.about.repository' })
     expect(repositoryButtons).toHaveLength(2)
-    expect(screen.queryByRole('button', { name: 'Cherry Studio' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Banana Studio' })).not.toBeInTheDocument()
     expect(screen.queryByRole('img')).not.toBeInTheDocument()
 
     await user.click(repositoryButtons[0])
-    expect(mocks.request).toHaveBeenCalledWith('system.shell.open_external_website', REPOSITORY_URL)
+    expect(toast.info).toHaveBeenCalledWith('fork.external_link_unavailable')
+    expect(mocks.request).not.toHaveBeenCalledWith('system.shell.open_external_website', REPOSITORY_URL)
 
     await user.click(repositoryButtons[1])
-    expect(mocks.request).toHaveBeenCalledWith('system.shell.open_external_website', REPOSITORY_URL)
+    expect(toast.info).toHaveBeenCalledTimes(2)
+    expect(mocks.request).not.toHaveBeenCalledWith('system.shell.open_external_website', REPOSITORY_URL)
   })
 })
