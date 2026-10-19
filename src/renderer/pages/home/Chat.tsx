@@ -35,6 +35,7 @@ import type { Topic } from '@renderer/types/topic'
 import { formatErrorMessageWithPrefix } from '@renderer/utils/error'
 
 import ChatContent from './ChatContent'
+import { ArchiveSettingsButton } from './components/ArchiveSettingsButton'
 import ChatNavbar from './components/ChatNavbar'
 import { TopicRightPane, useTopicBranchLiveStateSetter } from './components/TopicRightPane'
 import type { AddNewTopicPayload } from './types'
@@ -319,6 +320,7 @@ const Chat: FC<Props> = (props) => {
       topRightTool={
         showConversation ? (
           <>
+            <ArchiveSettingsButton />
             {props.resourcePaneCount && <ResourcePaneCountButton {...props.resourcePaneCount} />}
             <TopicRightPane.Shortcuts
               browserEnabled={
