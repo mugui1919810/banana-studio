@@ -63,6 +63,7 @@ interface Props {
   topicPending?: boolean
   centerSurface?: ConversationCenterSlot | null
   pane?: ReactNode
+  secondaryPane?: ReactNode
   paneOpen?: boolean
   panePosition?: ChatPanePosition
   onNewTopic?: (payload?: AddNewTopicPayload) => void | Promise<void>
@@ -260,6 +261,7 @@ const Chat: FC<Props> = (props) => {
       id="chat"
       className={activeTopic || centerSurface ? messageStyle : undefined}
       pane={props.pane}
+      secondaryPane={props.secondaryPane}
       paneOpen={props.paneOpen}
       panePosition={props.panePosition}
       onPaneCollapse={props.onPaneCollapse}

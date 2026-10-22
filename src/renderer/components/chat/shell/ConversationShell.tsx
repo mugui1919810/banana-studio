@@ -14,6 +14,7 @@ export interface ConversationShellProps {
   id?: string
   className?: string
   pane?: ReactNode
+  secondaryPane?: ReactNode
   paneOpen?: boolean
   panePosition?: ChatPanePosition
   topBar?: ReactNode
@@ -38,6 +39,7 @@ export default function ConversationShell({
   id,
   className,
   pane,
+  secondaryPane,
   paneOpen,
   panePosition,
   topBar,
@@ -79,6 +81,7 @@ export default function ConversationShell({
         <ConversationTopBarPortalProvider>
           <ChatAppShell
             pane={pane}
+            secondaryPane={secondaryPane}
             paneOpen={paneOpen}
             panePosition={panePosition}
             topBar={resolvedTopBar}

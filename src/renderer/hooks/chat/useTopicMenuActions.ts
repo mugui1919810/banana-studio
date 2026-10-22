@@ -7,7 +7,8 @@ import {
   resolveTopicMenuActions,
   type TopicActionContext,
   type TopicExportMenuOptions,
-  type TopicMoveAssistantTarget
+  type TopicMoveAssistantTarget,
+  type TopicMultiSelectionState
 } from '@renderer/components/chat/actions/topicContextMenuActions'
 import { getTopicMessages } from '@renderer/hooks/useTopic'
 import { ipcApi } from '@renderer/ipc'
@@ -23,11 +24,20 @@ type TopicMenuHandler = (topic: Topic) => void | Promise<void>
 type TopicDeleteHandler = (topic: Topic) => void | Promise<void>
 type TopicMoveToAssistantHandler = (topic: Topic, assistantId: string) => void | Promise<void>
 
+const EMPTY_MULTI_SELECTION: TopicMultiSelectionState = Object.freeze({
+  count: 0,
+  allPinned: false,
+  allSidebarPinned: false,
+  allUnpinned: false
+})
+
 export interface TopicMenuActionOptions {
   exportMenuOptions: TopicExportMenuOptions
   isArchiveBlocked: boolean
   isActiveInCurrentTab: boolean
+  isMultiSelect?: boolean
   isRenaming: boolean
+  multiSelection?: TopicMultiSelectionState
   notesPath: string
   onAutoRename: TopicMenuHandler
   onClearMessages: TopicMenuHandler
@@ -42,6 +52,7 @@ export interface TopicMenuActionOptions {
   onToggleSidebar?: TopicMenuHandler
   onSetPanePosition?: (position: TopicTabPosition) => void | Promise<void>
   onStartRename: TopicMenuHandler
+  onToggleMultiSelect?: TopicMenuHandler
   panePosition?: TopicTabPosition
   sidebarPinned?: boolean
   t: TFunction
@@ -53,7 +64,9 @@ export function createTopicActionContext({
   exportMenuOptions,
   isArchiveBlocked,
   isActiveInCurrentTab,
+  isMultiSelect = false,
   isRenaming,
+  multiSelection = EMPTY_MULTI_SELECTION,
   notesPath,
   assistantMoveTargets = [],
   onAutoRename,
@@ -68,6 +81,7 @@ export function createTopicActionContext({
   onToggleSidebar,
   onSetPanePosition,
   onStartRename,
+  onToggleMultiSelect,
   panePosition,
   sidebarPinned,
   t,
@@ -78,7 +92,9 @@ export function createTopicActionContext({
     exportMenuOptions,
     isArchiveBlocked,
     isActiveInCurrentTab,
+    isMultiSelect,
     isRenaming,
+    multiSelection,
     onAutoRename,
     onClearMessages,
     onCopyImage: onCopyImage ?? ((topic) => void EventEmitter.emit(EVENT_NAMES.COPY_TOPIC_IMAGE, topic)),
@@ -125,7 +141,9 @@ export function createTopicActionContext({
       const markdown = await topicToMarkdown(topic)
       void exportMarkdownToYuque(topic.name, markdown)
     },
-    assistantMoveTargets: assistantMoveTargets.filter((target) => target.id !== topic.assistantId),
+    assistantMoveTargets: isMultiSelect
+      ? assistantMoveTargets
+      : assistantMoveTargets.filter((target) => target.id !== topic.assistantId),
     onMoveToAssistant,
     onOpenInNewTab,
     onOpenInNewWindow,
@@ -148,6 +166,7 @@ export function createTopicActionContext({
       return exportTopicToNotes(topic, notesPath)
     },
     onStartRename,
+    onToggleMultiSelect,
     panePosition,
     sidebarPinned,
     t,
@@ -210,7 +229,9 @@ export function useTopicMenuActions(options: TopicMenuActionOptions) {
     exportMenuOptions,
     isArchiveBlocked,
     isActiveInCurrentTab,
+    isMultiSelect,
     isRenaming,
+    multiSelection,
     notesPath,
     assistantMoveTargets,
     onAutoRename,
@@ -225,6 +246,7 @@ export function useTopicMenuActions(options: TopicMenuActionOptions) {
     onToggleSidebar,
     onSetPanePosition,
     onStartRename,
+    onToggleMultiSelect,
     panePosition,
     sidebarPinned,
     t,
@@ -237,7 +259,9 @@ export function useTopicMenuActions(options: TopicMenuActionOptions) {
         exportMenuOptions,
         isArchiveBlocked,
         isActiveInCurrentTab,
+        isMultiSelect,
         isRenaming,
+        multiSelection,
         notesPath,
         assistantMoveTargets,
         onAutoRename,
@@ -252,6 +276,7 @@ export function useTopicMenuActions(options: TopicMenuActionOptions) {
         onToggleSidebar,
         onSetPanePosition,
         onStartRename,
+        onToggleMultiSelect,
         panePosition,
         sidebarPinned,
         t,
@@ -262,7 +287,9 @@ export function useTopicMenuActions(options: TopicMenuActionOptions) {
       exportMenuOptions,
       isArchiveBlocked,
       isActiveInCurrentTab,
+      isMultiSelect,
       isRenaming,
+      multiSelection,
       notesPath,
       assistantMoveTargets,
       onAutoRename,
@@ -277,6 +304,7 @@ export function useTopicMenuActions(options: TopicMenuActionOptions) {
       onToggleSidebar,
       onSetPanePosition,
       onStartRename,
+      onToggleMultiSelect,
       panePosition,
       sidebarPinned,
       t,

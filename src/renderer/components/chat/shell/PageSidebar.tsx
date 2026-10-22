@@ -6,12 +6,7 @@ import { useTranslation } from 'react-i18next'
 import { ErrorBoundary } from '@renderer/components/ErrorBoundary'
 import { cn } from '@renderer/utils/style'
 
-import {
-  CHAT_SHELL_PANE_WIDTH,
-  CHAT_SHELL_TRANSITION,
-  RESOURCE_LIST_PANE_MAX_WIDTH,
-  RESOURCE_LIST_PANE_MIN_WIDTH
-} from './paneLayout'
+import { CHAT_SHELL_TRANSITION, getResourceListPaneWidthPolicy, type ResourceListPaneWidthPreset } from './paneLayout'
 import { getVerticalSplitterProps } from './splitterA11y'
 import { useResourceListPaneResize } from './useResourceListPaneResize'
 
@@ -23,6 +18,7 @@ export interface PageSidebarProps {
   style?: CSSProperties
   onPaneCollapse?: () => void
   onResizingChange?: (resizing: boolean) => void
+  paneWidthPreset?: ResourceListPaneWidthPreset
 }
 
 export function PageSidebar({
@@ -32,12 +28,17 @@ export function PageSidebar({
   className,
   style,
   onPaneCollapse,
-  onResizingChange
+  onResizingChange,
+  paneWidthPreset = 'assistant'
 }: PageSidebarProps) {
   const { t } = useTranslation()
   const [hasOpened, setHasOpened] = useState(Boolean(open))
-  const { isResizing, paneRef, paneWidth, startResizing, setPaneWidth } = useResourceListPaneResize({ onPaneCollapse })
-  const resolvedWidth = width ?? CHAT_SHELL_PANE_WIDTH
+  const widthPolicy = getResourceListPaneWidthPolicy(paneWidthPreset)
+  const { isResizing, paneRef, paneWidth, startResizing, setPaneWidth } = useResourceListPaneResize({
+    onPaneCollapse,
+    widthPreset: paneWidthPreset
+  })
+  const resolvedWidth = width ?? `var(${widthPolicy.cssVar})`
 
   useEffect(() => {
     if (open) setHasOpened(true)
@@ -65,6 +66,7 @@ export function PageSidebar({
           aria-hidden={!open}
           inert={!open}
           data-ui="part:conversation-navigation"
+          data-pane-kind={paneWidthPreset}
           data-resource-list-pane
           data-resizing={isResizing || undefined}
           className={cn('group/resource-list-pane relative shrink-0 overflow-visible', className)}
@@ -78,8 +80,8 @@ export function PageSidebar({
             onMouseDown={startResizing}
             {...getVerticalSplitterProps({
               width: paneWidth,
-              min: RESOURCE_LIST_PANE_MIN_WIDTH,
-              max: RESOURCE_LIST_PANE_MAX_WIDTH,
+              min: widthPolicy.minWidth,
+              max: widthPolicy.maxWidth,
               label: t('common.resize_panel'),
               onResize: setPaneWidth
             })}

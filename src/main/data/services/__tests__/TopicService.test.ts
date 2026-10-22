@@ -1246,6 +1246,36 @@ describe('TopicService', () => {
       expect(await getOrderedIds()).toEqual(['t2', 't1', 't3'])
     })
 
+    it('notifies the topic order read model once after a reorder commits', async () => {
+      await seedThree()
+      notifyDataApiDataChangeMock.mockClear()
+
+      topicService.reorder('t3', { before: 't1' })
+
+      expect(notifyDataApiDataChangeMock).toHaveBeenCalledExactlyOnceWith([
+        { endpoint: '/topics', kind: 'order', dimension: 'orderKey', entityIds: ['t3'] }
+      ])
+    })
+
+    it('notifies one deduped order effect for a batch reorder and none for an empty batch', async () => {
+      await seedThree()
+      notifyDataApiDataChangeMock.mockClear()
+
+      topicService.reorderBatch([
+        { id: 't3', anchor: { position: 'first' } },
+        { id: 't2', anchor: { position: 'last' } },
+        { id: 't3', anchor: { position: 'first' } }
+      ])
+
+      expect(notifyDataApiDataChangeMock).toHaveBeenCalledExactlyOnceWith([
+        { endpoint: '/topics', kind: 'order', dimension: 'orderKey', entityIds: ['t3', 't2'] }
+      ])
+
+      notifyDataApiDataChangeMock.mockClear()
+      topicService.reorderBatch([])
+      expect(notifyDataApiDataChangeMock).not.toHaveBeenCalled()
+    })
+
     async function seedMoveTopics() {
       await dbh.db.insert(assistantTable).values([
         {

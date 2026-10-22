@@ -69,6 +69,12 @@ describe('DefaultPreferences', () => {
     expect(DefaultPreferences.default['agent.session.display_mode']).toBe(agentSessionDisplayDefault)
   })
 
+  it('defaults the right-panel topic display mode to time', () => {
+    const rightPanelDisplayDefault: PreferenceSchemas['default']['topic.right_panel.display_mode'] = 'time'
+
+    expect(DefaultPreferences.default['topic.right_panel.display_mode']).toBe(rightPanelDisplayDefault)
+  })
+
   it('preserves the legacy favorites shape independently of resource shortcut defaults', () => {
     const legacyFavorites: PreferenceSchemas['default']['ui.sidebar.favorites'] = [
       { type: 'app', id: 'agents' },

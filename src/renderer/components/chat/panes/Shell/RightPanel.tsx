@@ -28,6 +28,8 @@ export interface RightPanelInstance {
   /** Stable semantic identity. A change intentionally starts a fresh component instance. */
   instanceKey: string
   title: ReactNode
+  /** Optional controls rendered immediately after the title in the shell header. */
+  titleActions?: ReactNode
   readiness: RightPanelReadiness
   /** Shell renders the default header unless the panel composes its own header. */
   headerMode?: 'shell' | 'content'
@@ -475,7 +477,15 @@ export function RightPanelHeaderControls({ canMaximize = false }: { canMaximize?
   )
 }
 
-function RightPanelHeader({ canMaximize = false, title }: { canMaximize?: boolean; title?: ReactNode }) {
+function RightPanelHeader({
+  canMaximize = false,
+  title,
+  titleActions
+}: {
+  canMaximize?: boolean
+  title?: ReactNode
+  titleActions?: ReactNode
+}) {
   const state = useRightPanelState()
 
   return (
@@ -485,10 +495,17 @@ function RightPanelHeader({ canMaximize = false, title }: { canMaximize?: boolea
         'flex h-(--navbar-height) shrink-0 items-center justify-between gap-2 border-b border-border-subtle px-2 [-webkit-app-region:no-drag]',
         state.presentationMaximized && 'bg-card'
       )}>
-      <div
-        data-testid="shell-tab-title"
-        className="min-w-0 flex-1 truncate px-1 text-sm font-medium text-foreground select-none">
-        {title}
+      <div className="flex min-w-0 flex-1 items-center gap-0.5">
+        <div
+          data-testid="shell-tab-title"
+          className="min-w-0 shrink truncate px-1 text-sm font-medium text-foreground select-none">
+          {title}
+        </div>
+        {titleActions ? (
+          <div data-testid="shell-tab-title-actions" className="shrink-0">
+            {titleActions}
+          </div>
+        ) : null}
       </div>
       <RightPanelHeaderControls canMaximize={canMaximize} />
     </div>
@@ -510,7 +527,9 @@ function RightPanelEntry({
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden">
-      {showFallbackHeader ? <RightPanelHeader canMaximize={entry.canMaximize} title={entry.title} /> : null}
+      {showFallbackHeader ? (
+        <RightPanelHeader canMaximize={entry.canMaximize} title={entry.title} titleActions={entry.titleActions} />
+      ) : null}
       <div className="min-h-0 flex-1 overflow-hidden">
         <ErrorBoundary onError={() => setRenderFailed(true)}>
           <Panel active={active} panelId={entry.id} scope={scope} />
@@ -537,7 +556,11 @@ export function RightPanel() {
   return (
     <div className="flex h-full flex-col gap-0 overflow-hidden text-card-foreground">
       {activeEntry?.headerMode === 'content' ? null : (
-        <RightPanelHeader canMaximize={activeEntry?.canMaximize} title={activeEntry?.title} />
+        <RightPanelHeader
+          canMaximize={activeEntry?.canMaximize}
+          title={activeEntry?.title}
+          titleActions={activeEntry?.titleActions}
+        />
       )}
       <div className="relative min-h-0 flex-1 overflow-hidden">
         {mountedEntries.map((entry) => {

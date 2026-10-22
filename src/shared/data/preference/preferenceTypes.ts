@@ -101,7 +101,7 @@ export type ComposerShortcut = ShortcutBinding
 
 export type AssistantTabSortType = 'tags' | 'list'
 
-export type TopicDisplayMode = 'time' | 'assistant'
+export type TopicDisplayMode = 'time' | 'assistant' | 'custom'
 
 export type TopicTabPosition = 'left' | 'right'
 

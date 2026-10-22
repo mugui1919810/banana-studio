@@ -74,6 +74,19 @@ describe('predictCenterWidth', () => {
   it('drops the pane term when the panel is closed', () => {
     expect(predictCenterWidth({ shellWidth: 641, listWidth: 275, paneOpen: false, paneWidth: 460 })).toBe(366)
   })
+
+  it('subtracts a second left column and defaults it to zero', () => {
+    expect(
+      predictCenterWidth({
+        shellWidth: 800,
+        listWidth: 240,
+        secondaryWidth: 275,
+        paneOpen: false,
+        paneWidth: 460
+      })
+    ).toBe(285)
+    expect(predictCenterWidth({ shellWidth: 641, listWidth: 275, paneOpen: false, paneWidth: 460 })).toBe(366)
+  })
 })
 
 describe('evaluateAutoCollapse', () => {

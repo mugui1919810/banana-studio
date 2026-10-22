@@ -416,6 +416,13 @@
       "description": "Topic sidebar display grouping mode"
     },
     {
+      "targetKey": "topic.right_panel.display_mode",
+      "type": "PreferenceTypes.TopicDisplayMode",
+      "defaultValue": "time",
+      "status": "classified",
+      "description": "Topic list display mode in the classic right pane (time groups or persisted custom drag order)"
+    },
+    {
       "targetKey": "agent.icon_type",
       "type": "PreferenceTypes.AssistantIconType",
       "defaultValue": "emoji",

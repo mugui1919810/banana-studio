@@ -155,6 +155,7 @@ interface TestScope {
   firstReadiness: RightPanelReadiness
   firstHeaderMode?: 'shell' | 'content'
   firstShouldThrow?: boolean
+  firstTitleActions?: ReactNode
   secondReadiness: RightPanelReadiness
 }
 
@@ -184,6 +185,7 @@ const capabilities = [
       id: 'first',
       instanceKey: scope.firstKey,
       title: 'First',
+      titleActions: scope.firstTitleActions,
       readiness: scope.firstReadiness,
       headerMode: scope.firstHeaderMode,
       canMaximize: true
@@ -276,6 +278,31 @@ describe('RightPanel', () => {
 
     expect(screen.getByTestId('active-panel')).toHaveTextContent('first')
     expect(screen.getByText('first:0')).toBeInTheDocument()
+  })
+
+  it('renders title actions immediately after the shell title', () => {
+    render(
+      <Harness
+        defaultOpen
+        scope={{ ...readyScope, firstTitleActions: <button type="button">sort conversations</button> }}>
+        <RightPanel />
+      </Harness>
+    )
+
+    const title = screen.getByTestId('shell-tab-title')
+    const actions = screen.getByTestId('shell-tab-title-actions')
+    expect(actions).toContainElement(screen.getByRole('button', { name: 'sort conversations' }))
+    expect(title.compareDocumentPosition(actions) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it('omits the title-actions wrapper when the panel supplies none', () => {
+    render(
+      <Harness defaultOpen>
+        <RightPanel />
+      </Harness>
+    )
+
+    expect(screen.queryByTestId('shell-tab-title-actions')).not.toBeInTheDocument()
   })
 
   it('keeps a visited panel instance while switching panels', () => {

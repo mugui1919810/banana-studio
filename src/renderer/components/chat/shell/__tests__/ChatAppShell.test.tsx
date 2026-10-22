@@ -14,6 +14,7 @@ import {
   RESOURCE_LIST_PANE_DEFAULT_WIDTH,
   RESOURCE_LIST_PANE_MAX_WIDTH,
   RESOURCE_LIST_PANE_MIN_WIDTH,
+  RESOURCE_LIST_RIGHT_PANE_DEFAULT_WIDTH,
   type RightPaneWidthPolicy
 } from '../paneLayout'
 
@@ -153,6 +154,7 @@ describe('ChatAppShell', () => {
     document.body.style.cursor = ''
     document.body.style.userSelect = ''
     document.documentElement.style.removeProperty('--assistants-width')
+    document.documentElement.style.removeProperty('--topic-list-pane-width')
     vi.restoreAllMocks()
     globalThis.ResizeObserver = originalResizeObserver
   })
@@ -326,6 +328,114 @@ describe('ChatAppShell', () => {
     rerender(<ChatAppShell pane={<aside>topics</aside>} paneOpen panePosition="right" centerContent={<div />} />)
 
     expect(screen.getAllByText('topics')).toHaveLength(1)
+  })
+
+  it('renders the secondary left pane after the assistant pane and toggles both together', () => {
+    const { container, rerender } = render(
+      <ChatAppShell
+        pane={<aside>assistant rail</aside>}
+        secondaryPane={<aside>conversation column</aside>}
+        paneOpen
+        centerContent={<div />}
+      />
+    )
+
+    const panes = [...container.querySelectorAll('[data-resource-list-pane]')]
+    expect(panes).toHaveLength(2)
+    expect(panes[0]).toHaveAttribute('data-pane-kind', 'assistant')
+    expect(panes[1]).toHaveAttribute('data-pane-kind', 'topics')
+    expect(panes[0].compareDocumentPosition(panes[1]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(screen.getByText('assistant rail')).toBeInTheDocument()
+    expect(screen.getByText('conversation column')).toBeInTheDocument()
+
+    rerender(
+      <ChatAppShell
+        pane={<aside>assistant rail</aside>}
+        secondaryPane={<aside>conversation column</aside>}
+        paneOpen={false}
+        centerContent={<div />}
+      />
+    )
+
+    for (const pane of container.querySelectorAll('[data-resource-list-pane]')) {
+      expect(pane).toHaveAttribute('aria-hidden', 'true')
+    }
+  })
+
+  it('drives the topics column width from the resource-pane cache', () => {
+    persistCacheMock.state.listPaneWidth = 300
+
+    render(
+      <ChatAppShell
+        pane={<aside>assistant rail</aside>}
+        secondaryPane={<aside>conversation column</aside>}
+        paneOpen
+        main={<div />}
+      />
+    )
+
+    expect(document.documentElement.style.getPropertyValue('--topic-list-pane-width')).toBe('300px')
+  })
+
+  it('resizes and collapses from the topics column handle', async () => {
+    const onPaneCollapse = vi.fn()
+    const { container } = render(
+      <ChatAppShell
+        pane={<aside>assistant rail</aside>}
+        secondaryPane={<aside>conversation column</aside>}
+        paneOpen
+        onPaneCollapse={onPaneCollapse}
+        main={<div />}
+      />
+    )
+    const pane = container.querySelector('[data-resource-list-pane][data-pane-kind="topics"]')
+    const handle = pane?.querySelector('[data-resource-list-pane-resize-handle]')
+
+    if (!pane || !handle) {
+      throw new Error('Expected topics pane and resize handle')
+    }
+
+    vi.spyOn(pane, 'getBoundingClientRect').mockReturnValue(new DOMRect(100, 0, 275, 500))
+
+    fireEvent.mouseDown(handle, { clientX: 375 })
+    fireEvent.mouseMove(document, { clientX: 600 })
+
+    expect(persistCacheMock.setListPaneWidth).toHaveBeenCalledWith(RESOURCE_LIST_PANE_MAX_WIDTH)
+    expect(persistCacheMock.setWidth).not.toHaveBeenCalled()
+    expect(onPaneCollapse).not.toHaveBeenCalled()
+
+    fireEvent.mouseMove(document, { clientX: 0 })
+
+    expect(persistCacheMock.setListPaneWidth).toHaveBeenLastCalledWith(RESOURCE_LIST_RIGHT_PANE_DEFAULT_WIDTH)
+    await waitFor(() => expect(onPaneCollapse).toHaveBeenCalledTimes(1))
+  })
+
+  it('counts the secondary column in auto-collapse prediction', () => {
+    const onPaneAutoCollapseChange = vi.fn()
+    const { rerender } = render(
+      <ChatAppShell
+        pane={<aside>assistant rail</aside>}
+        secondaryPane={<aside>conversation column</aside>}
+        paneOpen
+        onPaneAutoCollapseChange={onPaneAutoCollapseChange}
+        main={<div />}
+      />
+    )
+
+    notifyObservedShellWidth(800)
+    expect(onPaneAutoCollapseChange).toHaveBeenLastCalledWith(true)
+
+    rerender(
+      <ChatAppShell
+        pane={<aside>assistant rail</aside>}
+        paneOpen
+        onPaneAutoCollapseChange={onPaneAutoCollapseChange}
+        main={<div />}
+      />
+    )
+
+    notifyObservedShellWidth(800)
+    expect(onPaneAutoCollapseChange).toHaveBeenLastCalledWith(false)
   })
 
   it('drives the left resource pane width from persist cache', () => {

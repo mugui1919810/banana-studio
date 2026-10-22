@@ -37,6 +37,8 @@ export function getPaneSpaceCap(available: number, paneMin = DEFAULT_PANE_MIN): 
 export interface PredictCenterWidthInput {
   shellWidth: number
   listWidth: number
+  /** Second left navigation column (assistant rail + conversation column), when present. */
+  secondaryWidth?: number
   /** Docked-open: presentation open and not maximized. */
   paneOpen: boolean
   paneWidth: number
@@ -51,11 +53,12 @@ export interface PredictCenterWidthInput {
 export function predictCenterWidth({
   shellWidth,
   listWidth,
+  secondaryWidth = 0,
   paneOpen,
   paneWidth,
   paneMin
 }: PredictCenterWidthInput): number {
-  const available = shellWidth - listWidth
+  const available = shellWidth - listWidth - secondaryWidth
   return available - (paneOpen ? resolveDockedPaneWidth(available, paneWidth, paneMin) : 0)
 }
 

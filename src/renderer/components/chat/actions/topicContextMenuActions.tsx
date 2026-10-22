@@ -8,6 +8,7 @@ import {
   ExternalLink,
   FileText,
   Image,
+  ListChecks,
   MoveRight,
   NotebookPen,
   PanelLeft,
@@ -50,11 +51,20 @@ export interface TopicMoveAssistantTarget {
 
 type TopicDeleteHandler = (topic: Topic) => void | Promise<void>
 
+export interface TopicMultiSelectionState {
+  count: number
+  allPinned: boolean
+  allSidebarPinned: boolean
+  allUnpinned: boolean
+}
+
 export interface TopicActionContext {
   exportMenuOptions: TopicExportMenuOptions
   isArchiveBlocked: boolean
   isActiveInCurrentTab: boolean
+  isMultiSelect: boolean
   isRenaming: boolean
+  multiSelection: TopicMultiSelectionState
   onAutoRename: TopicMenuHandler
   onClearMessages: TopicMenuHandler
   onCopyImage: TopicMenuHandler
@@ -80,6 +90,7 @@ export interface TopicActionContext {
   onSaveToNotes: TopicMenuHandler
   onSetPanePosition?: (position: TopicTabPosition) => void | Promise<void>
   onStartRename: TopicMenuHandler
+  onToggleMultiSelect?: TopicMenuHandler
   panePosition?: TopicTabPosition
   sidebarPinned?: boolean
   t: TFunction
@@ -146,18 +157,18 @@ topicActionRegistry.registerCommand({
 
 topicActionRegistry.registerCommand({
   id: 'topic.open-in-new-tab',
-  availability: ({ isActiveInCurrentTab, onOpenInNewTab }) => ({
-    visible: !!onOpenInNewTab && !isActiveInCurrentTab,
-    enabled: !!onOpenInNewTab && !isActiveInCurrentTab
-  }),
+  availability: ({ isActiveInCurrentTab, isMultiSelect, multiSelection, onOpenInNewTab }) => {
+    const available = !!onOpenInNewTab && (isMultiSelect || !isActiveInCurrentTab)
+    return { visible: available, enabled: available && (!isMultiSelect || multiSelection.count > 0) }
+  },
   run: ({ onOpenInNewTab, topic }) => onOpenInNewTab?.(topic)
 })
 
 topicActionRegistry.registerCommand({
   id: 'topic.open-in-new-window',
-  availability: ({ onOpenInNewWindow }) => ({
+  availability: ({ isMultiSelect, multiSelection, onOpenInNewWindow }) => ({
     visible: !!onOpenInNewWindow,
-    enabled: !!onOpenInNewWindow
+    enabled: !!onOpenInNewWindow && (!isMultiSelect || multiSelection.count > 0)
   }),
   run: ({ onOpenInNewWindow, topic }) => onOpenInNewWindow?.(topic)
 })
@@ -183,6 +194,11 @@ topicActionRegistry.registerCommand({
 topicActionRegistry.registerCommand({
   id: 'topic.clear-messages',
   run: ({ onClearMessages, topic }) => onClearMessages(topic)
+})
+
+topicActionRegistry.registerCommand({
+  id: 'topic.toggle-multi-select',
+  run: ({ onToggleMultiSelect, topic }) => onToggleMultiSelect?.(topic)
 })
 
 topicActionRegistry.registerCommand({
@@ -275,7 +291,9 @@ topicActionRegistry.registerAction({
   icon: () => <Sparkles size={14} />,
   order: 10,
   surface: 'menu',
-  availability: ({ isRenaming }) => ({ enabled: !isRenaming })
+  availability: ({ isMultiSelect, isRenaming, multiSelection }) => ({
+    enabled: !isRenaming && (!isMultiSelect || multiSelection.count > 0)
+  })
 })
 
 topicActionRegistry.registerAction({
@@ -285,25 +303,41 @@ topicActionRegistry.registerAction({
   icon: () => <Edit3 size={14} />,
   order: 20,
   surface: 'menu',
-  availability: ({ isRenaming }) => ({ enabled: !isRenaming })
+  availability: ({ isMultiSelect, isRenaming, multiSelection }) => ({
+    enabled: !isRenaming && (!isMultiSelect || multiSelection.count > 0)
+  })
 })
 
 topicActionRegistry.registerAction({
   id: 'topic.pin',
   commandId: 'topic.pin',
-  label: ({ t, topic }) => (topic.pinned ? t('chat.topics.unpin') : t('chat.topics.pin')),
-  icon: ({ topic }) => (topic.pinned ? <PinOffIcon size={14} /> : <PinIcon size={14} />),
+  label: ({ isMultiSelect, multiSelection, t, topic }) =>
+    (isMultiSelect ? multiSelection.allPinned : topic.pinned) ? t('chat.topics.unpin') : t('chat.topics.pin'),
+  icon: ({ isMultiSelect, multiSelection, topic }) =>
+    (isMultiSelect ? multiSelection.allPinned : topic.pinned) ? <PinOffIcon size={14} /> : <PinIcon size={14} />,
   order: 30,
-  surface: 'menu'
+  surface: 'menu',
+  availability: ({ isMultiSelect, multiSelection }) => ({
+    enabled: !isMultiSelect || multiSelection.count > 0
+  })
 })
 
 topicActionRegistry.registerAction({
   id: 'topic.toggle-sidebar',
   commandId: 'topic.toggle-sidebar',
-  label: ({ sidebarPinned, t }) => (sidebarPinned ? t('launchpad.unpin_from_sidebar') : t('launchpad.pin_to_sidebar')),
-  icon: ({ sidebarPinned }) => <SidebarShortcutIcon pinned={sidebarPinned} size={14} />,
+  label: ({ isMultiSelect, multiSelection, sidebarPinned, t }) =>
+    (isMultiSelect ? multiSelection.allSidebarPinned : sidebarPinned)
+      ? t('launchpad.unpin_from_sidebar')
+      : t('launchpad.pin_to_sidebar'),
+  icon: ({ isMultiSelect, multiSelection, sidebarPinned }) => (
+    <SidebarShortcutIcon pinned={isMultiSelect ? multiSelection.allSidebarPinned : !!sidebarPinned} size={14} />
+  ),
   order: 32,
-  surface: 'menu'
+  surface: 'menu',
+  availability: ({ isMultiSelect, multiSelection, onToggleSidebar }) => ({
+    visible: !!onToggleSidebar,
+    enabled: !!onToggleSidebar && (!isMultiSelect || multiSelection.count > 0)
+  })
 })
 
 topicActionRegistry.registerAction({
@@ -312,10 +346,13 @@ topicActionRegistry.registerAction({
   icon: () => <MoveRight size={14} />,
   order: 34,
   surface: 'menu',
-  availability: ({ assistantMoveTargets, onMoveToAssistant }) => ({
-    visible: !!onMoveToAssistant && assistantMoveTargets.length > 0,
-    enabled: !!onMoveToAssistant && assistantMoveTargets.length > 0
-  }),
+  availability: ({ assistantMoveTargets, isMultiSelect, multiSelection, onMoveToAssistant }) => {
+    const hasTargets = !!onMoveToAssistant && assistantMoveTargets.length > 0
+    return {
+      visible: hasTargets,
+      enabled: hasTargets && (!isMultiSelect || multiSelection.count > 0)
+    }
+  },
   children: ({ assistantMoveTargets }) =>
     assistantMoveTargets.map((target, index) => ({
       id: buildMoveToAssistantActionId(target.id),
@@ -376,10 +413,25 @@ topicActionRegistry.registerAction({
   icon: () => <BrushCleaning size={14} />,
   order: 40,
   surface: 'menu',
+  availability: ({ isMultiSelect, multiSelection }) => ({
+    enabled: !isMultiSelect || multiSelection.count > 0
+  }),
   confirm: ({ t }) => ({
     title: t('chat.input.clear.title'),
     confirmText: t('common.confirm'),
     cancelText: t('common.cancel')
+  })
+})
+
+topicActionRegistry.registerAction({
+  id: 'topic.toggle-multi-select',
+  commandId: 'topic.toggle-multi-select',
+  label: ({ t }) => t('chat.multiple.select.label'),
+  icon: () => <ListChecks size={14} />,
+  order: 45,
+  surface: 'menu',
+  availability: ({ isMultiSelect, onToggleMultiSelect }) => ({
+    visible: !!onToggleMultiSelect && !isMultiSelect
   })
 })
 
@@ -390,7 +442,8 @@ topicActionRegistry.registerAction({
   icon: () => <NotebookPen size={14} />,
   group: 'share',
   order: 50,
-  surface: 'menu'
+  surface: 'menu',
+  availability: ({ isMultiSelect }) => ({ enabled: !isMultiSelect })
 })
 
 topicActionRegistry.registerAction({
@@ -400,7 +453,8 @@ topicActionRegistry.registerAction({
   icon: () => <Database size={14} />,
   group: 'share',
   order: 60,
-  surface: 'menu'
+  surface: 'menu',
+  availability: ({ isMultiSelect }) => ({ enabled: !isMultiSelect })
 })
 
 topicActionRegistry.registerAction({
@@ -410,7 +464,7 @@ topicActionRegistry.registerAction({
   group: 'share',
   order: 70,
   surface: 'menu',
-  availability: (context) => ({ visible: hasExportOption(context) }),
+  availability: (context) => ({ visible: hasExportOption(context), enabled: !context.isMultiSelect }),
   children: [
     {
       id: 'topic.export.image',
@@ -494,6 +548,7 @@ topicActionRegistry.registerAction({
   group: 'share',
   order: 80,
   surface: 'menu',
+  availability: ({ isMultiSelect }) => ({ enabled: !isMultiSelect }),
   children: [
     {
       id: 'topic.copy.image',
@@ -532,11 +587,17 @@ topicActionRegistry.registerAction({
   surface: 'menu',
   // Deleting the last topic is allowed: the handler selects a neighbour when one exists and
   // otherwise clears the active topic. Pinned topics must be unpinned before they can be deleted.
-  availability: ({ isArchiveBlocked, t, topic }) => ({
-    visible: !topic.pinned,
-    enabled: !isArchiveBlocked,
-    reason: isArchiveBlocked ? t('recycle_bin.move.blocked_generation') : undefined
-  })
+  availability: ({ isArchiveBlocked, isMultiSelect, multiSelection, t, topic }) => {
+    const visible = isMultiSelect ? multiSelection.count > 0 && !multiSelection.allPinned : !topic.pinned
+    const enabled = isMultiSelect
+      ? multiSelection.count > 0 && multiSelection.allUnpinned && !isArchiveBlocked
+      : !isArchiveBlocked
+    return {
+      visible,
+      enabled,
+      reason: isArchiveBlocked ? t('recycle_bin.move.blocked_generation') : undefined
+    }
+  }
 })
 
 export function resolveTopicMenuActions(context: TopicActionContext): ResolvedAction<TopicActionContext>[] {
@@ -550,7 +611,7 @@ export async function executeTopicMenuAction(
   const targetAssistantId = getMoveToAssistantTargetId(action.id)
   if (targetAssistantId) {
     if (!context.onMoveToAssistant) return false
-    if (context.topic.assistantId === targetAssistantId) return false
+    if (!context.isMultiSelect && context.topic.assistantId === targetAssistantId) return false
     if (!context.assistantMoveTargets.some((target) => target.id === targetAssistantId)) return false
     await context.onMoveToAssistant(context.topic, targetAssistantId)
     return true

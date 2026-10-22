@@ -51,8 +51,10 @@ import {
   AssistantConversationPickerDialog,
   type AssistantConversationSelection
 } from './components/AssistantConversationPickerDialog'
+import { ClassicTopicListPane } from './components/ClassicTopicListPane'
 import { HomeTabRuntime } from './components/HomeTabRuntime'
 import { TopicRightPane } from './components/TopicRightPane'
+import { TopicRightPanelSortModeMenu } from './Tabs/components/TopicRightPanelSortModeMenu'
 import { Topics } from './Tabs/components/Topics'
 import HomeTabs from './Tabs/HomeTabs'
 import type { AddNewTopicPayload } from './types'
@@ -628,76 +630,97 @@ const HomePage: FC = () => {
     },
     [allTopics, setPanePosition, setShellPaneOpen, setTopicDisplayMode, setTopicPaneOpen, visibleTopic]
   )
-  // Classic layout = entity rail + right topic panel; modern layout = one left navigation panel (HomeTabs).
-  const pane =
-    isClassicTopicLayout && topicListPosition === 'right' ? (
-      <AssistantResourceList
-        activeAssistantId={visibleAssistantId ?? null}
-        activeTopicId={visibleTopic?.id ?? null}
-        dataEnabled={shellPaneOpen}
-        assistantTopicsSource={assistantTopicsSource}
-        onAddAssistant={() => {
-          setAssistantPickerOpen(true)
-        }}
-        historyRecordsActive={historyRecordsActive}
-        onOpenHistoryRecords={isWindowFrame ? undefined : openHistoryRecords}
-        onSelectTopic={setActiveTopicAndCloseResourceView}
-        onClearActiveTopic={clearActiveTopicAndCloseResourceView}
-        onSelectedAssistantClick={() => {
-          closeSurface()
-          if (!topicPaneOpen) setTopicPaneUserOpenIntentSeq((seq) => seq + 1)
-          setTopicPaneOpen(!topicPaneOpen)
-        }}
-        onCreateTopic={handleCreateEmptyTopicForAssistant}
-        manageAssistantsActive={manageAssistantsActive}
-        onManageAssistants={onManageAssistants}
-        onActiveAssistantDeleted={handleActiveAssistantDeleted}
-      />
-    ) : (
-      <HomeTabs
-        activeTopic={visibleTopic}
-        dataEnabled={shellPaneOpen}
-        assistantTopicsSource={assistantTopicsSource}
-        onActiveAssistantDeleted={handleActiveAssistantDeleted}
-        onAddAssistant={() => {
-          setAssistantPickerOpen(true)
-        }}
-        clearActiveTopic={clearActiveTopicAndCloseResourceView}
-        setActiveTopic={setActiveTopicAndCloseResourceView}
-        onNewTopic={handleCreateEmptyTopic}
-        historyRecordsActive={historyRecordsActive}
-        onOpenHistoryRecords={isWindowFrame ? undefined : openHistoryRecords}
-        revealRequest={topicRevealRequest}
-        manageAssistantsActive={manageAssistantsActive}
-        onManageAssistants={onManageAssistants}
-        onSetPanePosition={isWindowFrame ? undefined : setTopicListPosition}
-        panePosition="left"
-      />
-    )
-  // In classic layout the topic list moves into the chat's right pane as a capability; the single page-level
-  // provider owns the RightPanel for both views so the rail and the right panel share its open/maximize
-  // state. New (sidebar) view passes a null config, leaving the pane as branch/trace only.
-  const resourcePane: ResourcePaneConfig | null =
-    isClassicTopicLayout && topicListPosition === 'right'
-      ? {
-          label: t('chat.topics.title'),
-          node: (
-            <Topics
-              assistantTopicsSource={assistantTopicsSource}
-              dataEnabled={topicPaneOpen}
-              presentation="right-panel"
-              activeTopic={visibleTopic}
-              assistantIdFilter={visibleAssistantId ?? null}
-              clearActiveTopic={clearActiveTopicAndCloseResourceView}
-              setActiveTopic={setActiveTopicAndCloseResourceView}
-              onNewTopic={handleCreateEmptyTopic}
-              onSetPanePosition={setTopicListPosition}
-              panePosition="right"
-              revealRequest={topicRevealRequest}
-            />
-          )
-        }
-      : null
+  // Classic layout = entity rail + topic list (right pane, or a second column beside the rail);
+  // modern layout = one left navigation panel (HomeTabs).
+  const isClassicLeftTopicLayout = isClassicTopicLayout && topicListPosition === 'left'
+  const isClassicRightTopicLayout = isClassicTopicLayout && topicListPosition === 'right'
+  const pane = isClassicTopicLayout ? (
+    <AssistantResourceList
+      activeAssistantId={visibleAssistantId ?? null}
+      activeTopicId={visibleTopic?.id ?? null}
+      dataEnabled={shellPaneOpen}
+      assistantTopicsSource={assistantTopicsSource}
+      onAddAssistant={() => {
+        setAssistantPickerOpen(true)
+      }}
+      historyRecordsActive={historyRecordsActive}
+      onOpenHistoryRecords={isWindowFrame ? undefined : openHistoryRecords}
+      onSelectTopic={setActiveTopicAndCloseResourceView}
+      onClearActiveTopic={clearActiveTopicAndCloseResourceView}
+      onSelectedAssistantClick={
+        isClassicRightTopicLayout
+          ? () => {
+              closeSurface()
+              if (!topicPaneOpen) setTopicPaneUserOpenIntentSeq((seq) => seq + 1)
+              setTopicPaneOpen(!topicPaneOpen)
+            }
+          : undefined
+      }
+      onCreateTopic={handleCreateEmptyTopicForAssistant}
+      manageAssistantsActive={manageAssistantsActive}
+      onManageAssistants={onManageAssistants}
+      onActiveAssistantDeleted={handleActiveAssistantDeleted}
+    />
+  ) : (
+    <HomeTabs
+      activeTopic={visibleTopic}
+      dataEnabled={shellPaneOpen}
+      assistantTopicsSource={assistantTopicsSource}
+      onActiveAssistantDeleted={handleActiveAssistantDeleted}
+      onAddAssistant={() => {
+        setAssistantPickerOpen(true)
+      }}
+      clearActiveTopic={clearActiveTopicAndCloseResourceView}
+      setActiveTopic={setActiveTopicAndCloseResourceView}
+      onNewTopic={handleCreateEmptyTopic}
+      historyRecordsActive={historyRecordsActive}
+      onOpenHistoryRecords={isWindowFrame ? undefined : openHistoryRecords}
+      revealRequest={topicRevealRequest}
+      manageAssistantsActive={manageAssistantsActive}
+      onManageAssistants={onManageAssistants}
+      onSetPanePosition={isWindowFrame ? undefined : setTopicListPosition}
+      panePosition="left"
+    />
+  )
+  const secondaryPane = isClassicLeftTopicLayout ? (
+    <ClassicTopicListPane
+      activeTopic={visibleTopic}
+      assistantIdFilter={visibleAssistantId ?? null}
+      assistantTopicsSource={assistantTopicsSource}
+      clearActiveTopic={clearActiveTopicAndCloseResourceView}
+      dataEnabled={shellPaneOpen}
+      historyRecordsActive={historyRecordsActive}
+      manageAssistantsActive={manageAssistantsActive}
+      onNewTopic={handleCreateEmptyTopic}
+      onSetPanePosition={isWindowFrame ? undefined : setTopicListPosition}
+      revealRequest={topicRevealRequest}
+      setActiveTopic={setActiveTopicAndCloseResourceView}
+    />
+  ) : null
+  // In classic right layout the topic list moves into the chat's right pane as a capability; the single
+  // page-level provider owns the RightPanel for both views so the rail and the right panel share its
+  // open/maximize state. New (sidebar) view passes a null config, leaving the pane as branch/trace only.
+  const resourcePane: ResourcePaneConfig | null = isClassicRightTopicLayout
+    ? {
+        label: t('chat.topics.title'),
+        titleActions: <TopicRightPanelSortModeMenu />,
+        node: (
+          <Topics
+            assistantTopicsSource={assistantTopicsSource}
+            dataEnabled={topicPaneOpen}
+            presentation="right-panel"
+            activeTopic={visibleTopic}
+            assistantIdFilter={visibleAssistantId ?? null}
+            clearActiveTopic={clearActiveTopicAndCloseResourceView}
+            setActiveTopic={setActiveTopicAndCloseResourceView}
+            onNewTopic={handleCreateEmptyTopic}
+            onSetPanePosition={setTopicListPosition}
+            panePosition="right"
+            revealRequest={topicRevealRequest}
+          />
+        )
+      }
+    : null
   const assistantPickerDialog = isClassicTopicLayout ? (
     <AssistantConversationPickerDialog
       open={assistantPickerOpen}
@@ -738,6 +761,7 @@ const HomePage: FC = () => {
             topicPending={isActiveTopicLoading}
             centerSurface={centerSurface}
             pane={pane}
+            secondaryPane={secondaryPane}
             paneOpen={shellPaneOpen}
             panePosition="left"
             onPaneCollapse={() => setShellPaneOpenManually(false)}

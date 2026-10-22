@@ -5,6 +5,7 @@
   --sidebar-width: 200px;
   --assistants-width: 275px;
   --topic-list-width: 275px;
+  --topic-list-pane-width: 275px;
   --settings-width: 250px;
 }
 
@@ -13,6 +14,7 @@
   :root {
     --assistants-width: 210px;
     --topic-list-width: 210px;
+    --topic-list-pane-width: 210px;
     --settings-width: 210px;
   }
 }

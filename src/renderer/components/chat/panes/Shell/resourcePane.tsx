@@ -16,6 +16,8 @@ export type ResourcePaneConfig = {
   node: ReactNode
   /** Tab label + toggle tooltip source — pages supply the product word ("topic" / "session"). */
   label: string
+  /** Controls rendered by the shell header immediately after the pane title. */
+  titleActions?: ReactNode
 }
 
 interface ResourcePaneCapabilityScope {
@@ -41,6 +43,7 @@ export function createResourcePaneCapability<TScope extends ResourcePaneCapabili
       id: RESOURCE_PANE_TAB,
       instanceKey,
       title: scope.resourcePane?.label ?? '',
+      titleActions: scope.resourcePane?.titleActions,
       readiness: scope.resourcePane ? 'ready' : 'unavailable'
     })
   }

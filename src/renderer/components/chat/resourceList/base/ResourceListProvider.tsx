@@ -379,6 +379,7 @@ export type ResourceListProviderProps<T extends ResourceListItemBase> = {
   estimateItemSize?: (index: number) => number
   onSelectItem?: (id: string) => void
   onRenameItem?: (id: string, name: string) => void
+  onCancelRenameItem?: (id: string) => void
   onGroupHeaderSelectItem?: (id: string) => void
   onEmptyGroupHeaderClick?: (group: ResourceListGroup) => boolean | void
   onOpenContextMenu?: (id: string) => void
@@ -575,6 +576,7 @@ export function ResourceListProvider<T extends ResourceListItemBase>({
   estimateItemSize = estimateResourceListDefaultRowSize,
   onSelectItem,
   onRenameItem,
+  onCancelRenameItem,
   onGroupHeaderSelectItem,
   onEmptyGroupHeaderClick,
   onOpenContextMenu,
@@ -600,6 +602,8 @@ export function ResourceListProvider<T extends ResourceListItemBase>({
   const effectiveCollapsedIds = normalizeCollapsedIds(collapsedState ?? state.collapsedGroups)
   const effectiveSelectedId = selectedIdProp !== undefined ? selectedIdProp : state.selectedId
   const isSelectedControlled = selectedIdProp !== undefined
+  const renamingIdRef = useRef<string | null>(null)
+  renamingIdRef.current = state.renamingId
   const handledRevealRequestRef = useRef<string | null>(null)
   const collapsedStateRef = useRef<readonly string[]>([])
   const uiStoreRef = useRef<ResourceListUiService | null>(null)
@@ -834,6 +838,8 @@ export function ResourceListProvider<T extends ResourceListItemBase>({
         dispatch({ type: 'cancelRename' })
       },
       cancelRename: () => {
+        const renamingId = renamingIdRef.current
+        if (renamingId) onCancelRenameItem?.(renamingId)
         uiStore.setRenamingId(null)
         dispatch({ type: 'cancelRename' })
       },
@@ -896,6 +902,7 @@ export function ResourceListProvider<T extends ResourceListItemBase>({
       isControlled,
       isSelectedControlled,
       notifyControlledCollapsedStateChange,
+      onCancelRenameItem,
       onGroupHeaderSelectItem,
       onOpenContextMenu,
       onRenameItem,

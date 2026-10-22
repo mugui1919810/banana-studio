@@ -100,6 +100,14 @@ const homeMocks = vi.hoisted(() => ({
   routeSearch: {} as Record<string, unknown>,
   setShowSidebar: vi.fn(),
   topicPanelTopicsSource: undefined as unknown,
+  topicPanelProps: undefined as
+    | {
+        dataEnabled?: boolean
+        panePosition?: string
+        onSetPanePosition?: (position: string) => void | Promise<void>
+        setActiveTopic?: (topic: Topic) => void
+      }
+    | undefined,
   isActiveTab: false
 }))
 
@@ -319,6 +327,7 @@ vi.mock('../Chat', () => ({
     activeTopic,
     centerSurface,
     pane,
+    secondaryPane,
     paneOpen,
     panePosition,
     showResourceListControls,
@@ -335,6 +344,7 @@ vi.mock('../Chat', () => ({
     activeTopic?: Topic
     centerSurface?: { content?: ReactNode } | null
     pane?: ReactNode
+    secondaryPane?: ReactNode
     paneOpen?: boolean
     panePosition?: string
     showResourceListControls?: boolean
@@ -418,6 +428,7 @@ vi.mock('../Chat', () => ({
         )}
         <div data-testid="topic-right-pane-viewport" />
         {pane}
+        {secondaryPane}
       </section>
     )
   }
@@ -460,6 +471,7 @@ vi.mock('../Tabs/HomeTabs', () => ({
               assistantId: 'assistant-default',
               name: 'Topic Next',
               messages: [],
+              lastActivityAt: '2026-01-02T00:00:00.000Z',
               createdAt: '2026-01-02T00:00:00.000Z',
               updatedAt: '2026-01-02T00:00:00.000Z'
             })
@@ -491,24 +503,59 @@ vi.mock('../Tabs/HomeTabs', () => ({
   }
 }))
 
+vi.mock('../Tabs/components/TopicRightPanelSortModeMenu', () => ({
+  TopicRightPanelSortModeMenu: () => <button type="button" aria-label="Sort mode" />
+}))
+
 vi.mock('../Tabs/components/Topics', () => ({
   Topics: ({
     assistantIdFilter,
     assistantTopicsSource,
-    presentation
+    dataEnabled,
+    onSetPanePosition,
+    panePosition,
+    presentation,
+    setActiveTopic
   }: {
     assistantIdFilter?: string | null
     assistantTopicsSource?: unknown
+    dataEnabled?: boolean
+    onSetPanePosition?: (position: string) => void | Promise<void>
+    panePosition?: string
     presentation?: string
+    setActiveTopic?: (topic: Topic) => void
   }) => {
     homeMocks.topicPanelTopicsSource = assistantTopicsSource
+    homeMocks.topicPanelProps = { dataEnabled, onSetPanePosition, panePosition, setActiveTopic }
 
     return (
       <div
         data-assistant-id={assistantIdFilter ?? ''}
+        data-data-enabled={String(dataEnabled)}
+        data-pane-position={panePosition ?? ''}
         data-presentation={presentation ?? ''}
-        data-testid="topic-resource-panel"
-      />
+        data-testid="topic-resource-panel">
+        <button
+          type="button"
+          onClick={() => {
+            setActiveTopic?.({
+              id: 'topic-next',
+              assistantId: 'assistant-default',
+              name: 'Topic Next',
+              messages: [],
+              lastActivityAt: '2026-01-02T00:00:00.000Z',
+              createdAt: '2026-01-02T00:00:00.000Z',
+              updatedAt: '2026-01-02T00:00:00.000Z'
+            })
+          }}>
+          Select topic next
+        </button>
+        {onSetPanePosition && (
+          <button type="button" onClick={() => void onSetPanePosition('right')}>
+            Move topics right
+          </button>
+        )}
+      </div>
     )
   }
 }))
@@ -592,9 +639,11 @@ vi.mock('@renderer/components/chat/resourceList/AssistantResourceList', () => ({
         <button type="button" onClick={() => void onAddAssistant?.()}>
           Open assistant picker
         </button>
-        <button type="button" onClick={() => void onOpenHistoryRecords?.()}>
-          Open history records
-        </button>
+        {onOpenHistoryRecords && (
+          <button type="button" onClick={() => void onOpenHistoryRecords()}>
+            Open history records
+          </button>
+        )}
         <button type="button" onClick={() => void onActiveAssistantDeleted?.(activeAssistantId ?? '')}>
           Delete active assistant
         </button>
@@ -608,9 +657,11 @@ vi.mock('@renderer/components/chat/resourceList/AssistantResourceList', () => ({
           }>
           Create default assistant topic
         </button>
-        <button type="button" onClick={() => void onSelectedAssistantClick?.()}>
-          Toggle selected assistant pane
-        </button>
+        {onSelectedAssistantClick && (
+          <button type="button" onClick={() => void onSelectedAssistantClick()}>
+            Toggle selected assistant pane
+          </button>
+        )}
         {onManageAssistants && (
           <button type="button" onClick={() => void onManageAssistants()}>
             assistants.presets.manage.title
@@ -719,6 +770,7 @@ describe('HomePage', () => {
     homeMocks.createdAssistantTopicsSource = undefined
     homeMocks.homeTabsTopicsSource = undefined
     homeMocks.topicPanelTopicsSource = undefined
+    homeMocks.topicPanelProps = undefined
     homeMocks.persistCacheValues.clear()
     homeMocks.addAssistant.mockResolvedValue({
       id: 'assistant-created',
@@ -819,18 +871,40 @@ describe('HomePage', () => {
     expect(homeMocks.topicPanelTopicsSource).toBe(homeMocks.createdAssistantTopicsSource)
   })
 
-  it('does not render the topic resource pane when the classic topic position is left', () => {
+  it('renders an assistant rail and an adjacent conversation column when the classic topic position is left', () => {
     homeMocks.preferenceValues.set('topic.tab.display_mode', 'assistant')
     homeMocks.preferenceValues.set('topic.tab.position', 'left')
+    homeMocks.preferenceValues.set('topic.tab.show', true)
     homeMocks.persistCacheValues.set('ui.chat.right_pane_open_override', true)
 
     render(<HomePage />)
 
-    expect(screen.getByTestId('home-tabs')).toBeInTheDocument()
+    expect(screen.getByTestId('assistant-resource-list')).toBeInTheDocument()
+    expect(screen.getByTestId('classic-topic-list-pane')).toBeInTheDocument()
+    expect(screen.getByTestId('topic-resource-panel')).toHaveAttribute('data-assistant-id', 'assistant-1')
+    expect(screen.getByTestId('topic-resource-panel')).toHaveAttribute('data-presentation', 'right-panel')
+    expect(screen.getByTestId('topic-resource-panel')).toHaveAttribute('data-pane-position', 'left')
+    expect(screen.getByTestId('topic-resource-panel')).toHaveAttribute('data-data-enabled', 'true')
     expect(screen.getByTestId('topic-right-pane-provider')).toHaveAttribute('data-default-tab', 'branch')
-    expect(screen.queryByTestId('assistant-resource-list')).not.toBeInTheDocument()
-    expect(screen.queryByTestId('topic-resource-panel')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('home-tabs')).not.toBeInTheDocument()
     expect(screen.queryByTestId('resource-pane-count')).not.toBeInTheDocument()
+    // The rail no longer toggles a right pane in the two-column left layout.
+    expect(screen.queryByRole('button', { name: 'Toggle selected assistant pane' })).not.toBeInTheDocument()
+  })
+
+  it('moves the classic left conversation column into the right pane from its position action', async () => {
+    homeMocks.preferenceValues.set('topic.tab.display_mode', 'assistant')
+    homeMocks.preferenceValues.set('topic.tab.position', 'left')
+    homeMocks.preferenceValues.set('topic.tab.show', true)
+    homeMocks.persistCacheValues.set('ui.chat.right_pane_open_override', false)
+
+    render(<HomePage />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Move topics right' }))
+
+    await vi.waitFor(() => expect(homeMocks.preferenceValues.get('topic.tab.position')).toBe('right'))
+    expect(homeMocks.cacheSetPersist).toHaveBeenCalledWith('ui.chat.right_pane_open_override', true)
+    expect(homeMocks.setShowSidebar).toHaveBeenCalledWith(true)
   })
 
   it('does not auto-open the topic right pane when switching to assistant display mode with left topic position', () => {
@@ -1744,9 +1818,10 @@ describe('HomePage', () => {
 
     expect(screen.getByTestId('pane-open')).toHaveTextContent('false')
     expect(screen.getByTestId('show-resource-list-controls')).toHaveTextContent('true')
-    expect(screen.getByTestId('home-tabs')).toBeInTheDocument()
-    expect(screen.queryByTestId('assistant-resource-list')).not.toBeInTheDocument()
-    expect(screen.queryByTestId('topic-resource-panel')).not.toBeInTheDocument()
+    expect(screen.getByTestId('assistant-resource-list')).toBeInTheDocument()
+    expect(screen.getByTestId('classic-topic-list-pane')).toBeInTheDocument()
+    expect(screen.getByTestId('topic-resource-panel')).toHaveAttribute('data-presentation', 'right-panel')
+    expect(screen.queryByTestId('home-tabs')).not.toBeInTheDocument()
     expect(screen.queryByTestId('resource-pane-count')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Move topics right' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Open history records' })).not.toBeInTheDocument()

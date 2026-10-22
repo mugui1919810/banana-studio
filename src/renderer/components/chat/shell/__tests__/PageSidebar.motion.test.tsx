@@ -4,7 +4,7 @@ import { Activity } from 'react'
 import { afterEach, beforeEach, expect, it } from 'vitest'
 
 import { PageSidebar } from '../PageSidebar'
-import { RESOURCE_LIST_PANE_CACHE_KEY } from '../paneLayout'
+import { RESOURCE_LIST_PANE_CACHE_KEY, RESOURCE_LIST_RIGHT_PANE_CACHE_KEY } from '../paneLayout'
 
 beforeEach(() => {
   MockUseCacheUtils.resetMocks()
@@ -14,6 +14,7 @@ beforeEach(() => {
 afterEach(() => {
   MockUseCacheUtils.resetMocks()
   document.documentElement.style.removeProperty('--assistants-width')
+  document.documentElement.style.removeProperty('--topic-list-pane-width')
 })
 
 it.each(['settled', 'in-flight'] as const)('preserves the %s sidebar collapse across tab switches', async (phase) => {
@@ -78,6 +79,22 @@ it('does not let an interrupted collapse overwrite the latest target on reconnec
     expect(pane.style.width).toBe('240px')
     expect(pane.style.opacity).toBe('1')
     expect(pane).toHaveAttribute('aria-hidden', 'false')
+  })
+})
+
+it('drives the topics column width from the resource-pane key', async () => {
+  MockUseCacheUtils.setPersistCacheValue(RESOURCE_LIST_RIGHT_PANE_CACHE_KEY, 283)
+
+  const { container } = render(
+    <PageSidebar open paneWidthPreset="topics">
+      content
+    </PageSidebar>
+  )
+  const pane = container.querySelector<HTMLElement>('[data-resource-list-pane][data-pane-kind="topics"]')!
+
+  await waitFor(() => {
+    expect(document.documentElement.style.getPropertyValue('--topic-list-pane-width')).toBe('283px')
+    expect(pane.style.width).toBe('var(--topic-list-pane-width)')
   })
 })
 

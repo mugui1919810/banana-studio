@@ -30,9 +30,12 @@ type ConversationListOptionsMenuProps<TMode extends string> = {
   manageAction?: ConversationListMenuAction
   mode: TMode
   onChange: (mode: TMode) => void
+  /** Open the menu when the pointer enters the trigger, in addition to the normal click/keyboard. */
+  openOnHover?: boolean
   options: readonly ConversationListOption<TMode>[]
   sectionToggle?: ConversationListSectionToggle
   title: string
+  triggerIcon?: ReactNode
 }
 
 export function ConversationListOptionsMenu<TMode extends string>({
@@ -40,9 +43,11 @@ export function ConversationListOptionsMenu<TMode extends string>({
   manageAction,
   mode,
   onChange,
+  openOnHover = false,
   options,
   sectionToggle,
-  title
+  title,
+  triggerIcon
 }: ConversationListOptionsMenuProps<TMode>) {
   const [open, setOpen] = useState(false)
   const runAfterMenuClose = (action: () => void) => {
@@ -66,8 +71,11 @@ export function ConversationListOptionsMenu<TMode extends string>({
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <ResourceList.HeaderActionButton type="button" aria-label={title}>
-          <ListFilter className="block" />
+        <ResourceList.HeaderActionButton
+          type="button"
+          aria-label={title}
+          onMouseEnter={openOnHover ? () => setOpen(true) : undefined}>
+          {triggerIcon ?? <ListFilter className="block" />}
         </ResourceList.HeaderActionButton>
       </PopoverTrigger>
       <PopoverContent align="end" side="bottom" sideOffset={4} className="w-44 p-1">

@@ -1,0 +1,17 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"path": "../../DDDD/claude code answers"
+		}
+	],
+	"settings": {
+		"files.associations": {
+			"*.css": "tailwindcss",
+			".oxlintrc.json": "jsonc"
+		},
+		"typescript.tsdk": "node_modules/typescript/lib"
+	}
+}

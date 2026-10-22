@@ -829,6 +829,7 @@ export class TopicService {
         scope: isNull(topicTable.deletedAt)
       })
     })
+    notifyDataApiDataChange([{ endpoint: '/topics', kind: 'order', dimension: 'orderKey', entityIds: [id] }])
   }
 
   reorderBatch(moves: Array<{ id: string; anchor: OrderRequest }>): void {
@@ -841,6 +842,14 @@ export class TopicService {
         scope: isNull(topicTable.deletedAt)
       })
     })
+    notifyDataApiDataChange([
+      {
+        endpoint: '/topics',
+        kind: 'order',
+        dimension: 'orderKey',
+        entityIds: [...new Set(moves.map((move) => move.id))]
+      }
+    ])
   }
 
   listIdsByAssistantTx(tx: DbOrTx, assistantId: string): string[] {

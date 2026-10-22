@@ -1,4 +1,4 @@
-import { Bot, Clock, History } from 'lucide-react'
+import { Bot, Clock, GripVertical, History } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 
@@ -9,10 +9,12 @@ import { ConversationListOptionsMenu } from './ConversationListOptionsMenu'
 const TOPIC_DISPLAY_OPTIONS: TopicDisplayMode[] = ['time', 'assistant']
 const TOPIC_DISPLAY_LABEL_KEYS: Record<TopicDisplayMode, string> = {
   assistant: 'chat.topics.display.assistant',
+  custom: 'chat.topics.display.custom',
   time: 'chat.topics.display.time'
 }
 const TOPIC_DISPLAY_ICONS: Record<TopicDisplayMode, ReactNode> = {
   assistant: <Bot size={16} />,
+  custom: <GripVertical size={16} />,
   time: <Clock size={16} />
 }
 

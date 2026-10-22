@@ -199,7 +199,9 @@ vi.mock('@renderer/components/Avatar/ModelAvatar', () => ({
 }))
 
 const topicDataMocks = vi.hoisted(() => ({
+  batchUpdateTopics: vi.fn().mockResolvedValue([]),
   clearTopicMessagesTrigger: vi.fn().mockResolvedValue({ deletedIds: ['message-c'] }),
+  deleteTopics: vi.fn().mockResolvedValue({ deletedIds: [] as string[], deletedCount: 0 }),
   deleteTopicsByAssistantId: vi.fn().mockResolvedValue({ deletedIds: [] as string[], deletedCount: 0 }),
   deleteTopic: vi.fn().mockResolvedValue(undefined),
   moveTopic: vi.fn().mockResolvedValue(undefined),
@@ -308,7 +310,9 @@ vi.mock('@renderer/hooks/useTopic', async () => {
     useTopicMutations: () => ({
       updateTopic: topicDataMocks.updateTopic,
       deleteTopic: topicDataMocks.deleteTopic,
+      deleteTopics: topicDataMocks.deleteTopics,
       deleteTopicsByAssistantId: topicDataMocks.deleteTopicsByAssistantId,
+      batchUpdateTopics: topicDataMocks.batchUpdateTopics,
       moveTopic: topicDataMocks.moveTopic,
       refreshTopics: topicDataMocks.refreshTopics,
       restoreTopic: topicDataMocks.restoreTopic
@@ -439,6 +443,8 @@ vi.mock('react-i18next', () => ({
         if (key === 'assistants.presets.manage.title') return 'Manage Assistants'
         if (key === 'chat.topics.clear.title') return 'Clear messages'
         if (key === 'chat.input.clear.title') return 'Clear all messages?'
+        if (key === 'chat.multiple.select.label') return 'Multiple Select'
+        if (key === 'common.select') return 'Select'
         if (key === 'notes.save') return 'Save to notes'
         if (key === 'chat.save.topic.knowledge.menu_title') return 'Save to knowledge base'
         if (key === 'chat.save.topic.knowledge.title') return 'Save to knowledge base'
@@ -613,6 +619,52 @@ function withEarlierTopic(items: ApiTopic[]): ApiTopic[] {
       orderKey: 'zzz',
       createdAt: '2025-11-01T01:00:00.000Z',
       updatedAt: '2025-11-01T01:00:00.000Z'
+    })
+  ]
+}
+
+/** Right-panel tabs are scoped to one assistant, so custom-order fixtures stay in that scope. */
+function createAssistantScopedTopicsForCustomOrder(): ApiTopic[] {
+  return [
+    createApiTopic({
+      id: 'topic-a',
+      name: 'Alpha topic',
+      assistantId: 'assistant-1',
+      orderKey: 'a',
+      createdAt: '2026-01-03T01:00:00.000Z',
+      updatedAt: '2026-01-03T01:00:00.000Z'
+    }),
+    createApiTopic({
+      id: 'topic-b',
+      name: 'Beta pinned',
+      assistantId: 'assistant-1',
+      orderKey: 'b',
+      createdAt: '2026-01-02T01:00:00.000Z',
+      updatedAt: '2026-01-02T01:00:00.000Z'
+    }),
+    createApiTopic({
+      id: 'topic-c',
+      name: 'Gamma topic',
+      assistantId: 'assistant-1',
+      orderKey: 'c',
+      createdAt: '2026-01-01T01:00:00.000Z',
+      updatedAt: '2026-01-01T01:00:00.000Z'
+    }),
+    createApiTopic({
+      id: 'topic-d',
+      name: 'Delta archive',
+      assistantId: 'assistant-1',
+      orderKey: 'd',
+      createdAt: '2025-12-20T01:00:00.000Z',
+      updatedAt: '2025-12-20T01:00:00.000Z'
+    }),
+    createApiTopic({
+      id: 'topic-e',
+      name: 'Epsilon yesterday',
+      assistantId: 'assistant-1',
+      orderKey: 'e',
+      createdAt: '2026-01-02T01:00:00.000Z',
+      updatedAt: '2026-01-02T01:00:00.000Z'
     })
   ]
 }
@@ -842,6 +894,15 @@ function deleteTopicRow(row: HTMLElement) {
   fireEvent.click(within(row).getByRole('button', { name: 'Archive' }))
 }
 
+async function enterMultiSelect(topicName = 'Alpha topic') {
+  fireEvent.contextMenu(getByRowText(topicName))
+  const menuContent = getByRowText(topicName)
+    .closest('[data-testid="context-menu"]')
+    ?.querySelector('[data-testid="context-menu-content"]') as HTMLElement
+  fireEvent.click(within(menuContent).getByRole('button', { name: 'Multiple Select' }))
+  await vi.waitFor(() => expect(screen.getAllByTestId('topic-select-checkbox').length).toBeGreaterThan(0))
+}
+
 function sortableData(id: string) {
   const data = dndMocks.sortableData.get(id)
   if (!data) {
@@ -913,6 +974,8 @@ describe('Topics', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     topicDataMocks.updateTopic.mockReset().mockResolvedValue(undefined)
+    topicDataMocks.batchUpdateTopics.mockReset().mockResolvedValue([])
+    topicDataMocks.deleteTopics.mockReset().mockResolvedValue({ deletedIds: [], deletedCount: 0 })
     topicRenameMocks.getTopicMessages.mockReset().mockResolvedValue([])
     clearPendingTopicImageActionsForTest()
     topicStreamStatusMocks.statuses.clear()
@@ -1516,6 +1579,79 @@ describe('Topics', () => {
     expect(screen.queryByRole('button', { name: 'Alpha Assistant' })).not.toBeInTheDocument()
   })
 
+  it('uses the persisted custom order without time headers in the right panel', () => {
+    MockUsePreferenceUtils.setPreferenceValue('topic.right_panel.display_mode' as never, 'custom')
+
+    renderTopicList({
+      assistantTopicsSource: createAssistantTopicsSource(createAssistantScopedTopicsForCustomOrder()),
+      assistantIdFilter: 'assistant-1',
+      presentation: 'right-panel'
+    })
+
+    expect(queryByRowText('Today')).not.toBeInTheDocument()
+    expect(queryByRowText('Yesterday')).not.toBeInTheDocument()
+    expect(getByRowText('Pinned')).toBeInTheDocument()
+
+    const rowTexts = screen.getAllByTestId('topic-list-row').map((row) => row.textContent ?? '')
+    expect(rowTexts.findIndex((text) => text.includes('Beta pinned'))).toBe(0)
+    const alpha = rowTexts.findIndex((text) => text.includes('Alpha topic'))
+    const gamma = rowTexts.findIndex((text) => text.includes('Gamma topic'))
+    const delta = rowTexts.findIndex((text) => text.includes('Delta archive'))
+    const epsilon = rowTexts.findIndex((text) => text.includes('Epsilon yesterday'))
+    expect(alpha).toBeLessThan(gamma)
+    expect(gamma).toBeLessThan(delta)
+    expect(delta).toBeLessThan(epsilon)
+  })
+
+  it('persists custom-order drops in the right panel', async () => {
+    MockUsePreferenceUtils.setPreferenceValue('topic.right_panel.display_mode' as never, 'custom')
+
+    renderTopicList({
+      assistantTopicsSource: createAssistantTopicsSource(createAssistantScopedTopicsForCustomOrder()),
+      assistantIdFilter: 'assistant-1',
+      presentation: 'right-panel'
+    })
+
+    dndMocks.onDragEnd?.({
+      active: {
+        data: sortableData('item:topic-d'),
+        id: 'item:topic-d',
+        rect: { current: { initial: null, translated: { top: 10, height: 20 } } }
+      },
+      over: { data: sortableData('item:topic-c'), id: 'item:topic-c', rect: { top: 80, height: 20 } }
+    })
+
+    await vi.waitFor(() =>
+      expect(topicDataMocks.moveTopic).toHaveBeenCalledWith('topic-d', {
+        anchor: { before: 'topic-c' }
+      })
+    )
+    expect(topicDataMocks.moveTopic).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not reorder pinned conversations in right-panel custom mode', () => {
+    MockUsePreferenceUtils.setPreferenceValue('topic.right_panel.display_mode' as never, 'custom')
+
+    renderTopicList({
+      assistantTopicsSource: createAssistantTopicsSource(createAssistantScopedTopicsForCustomOrder()),
+      assistantIdFilter: 'assistant-1',
+      presentation: 'right-panel'
+    })
+
+    expect(getByRowText('Beta pinned')).toBeInTheDocument()
+
+    dndMocks.onDragEnd?.({
+      active: {
+        data: sortableData('item:topic-b'),
+        id: 'item:topic-b',
+        rect: { current: { initial: null, translated: { top: 10, height: 20 } } }
+      },
+      over: { data: sortableData('item:topic-a'), id: 'item:topic-a', rect: { top: 80, height: 20 } }
+    })
+
+    expect(topicDataMocks.moveTopic).not.toHaveBeenCalled()
+  })
+
   it('pins from the trailing row button without selecting the topic', async () => {
     const { getByText, setActiveTopic } = renderTopicList()
 
@@ -1662,6 +1798,180 @@ describe('Topics', () => {
       expect.objectContaining({ id: 'topic-a', assistantId: 'assistant-2', messages: activeTopic.messages })
     )
     expect(toast.success).toHaveBeenCalledWith('Moved 1 conversation(s)')
+  })
+
+  it('enters multi-select mode from the menu and exits on Escape', async () => {
+    renderTopicList()
+
+    fireEvent.contextMenu(getByRowText('Alpha topic'))
+    const menuContent = getByRowText('Alpha topic')
+      .closest('[data-testid="context-menu"]')
+      ?.querySelector('[data-testid="context-menu-content"]') as HTMLElement
+    fireEvent.click(within(menuContent).getByRole('button', { name: 'Multiple Select' }))
+
+    await vi.waitFor(() => expect(screen.getAllByTestId('topic-select-checkbox')).toHaveLength(5))
+    expect(within(getTopicRow('Alpha topic')).getByTestId('topic-select-checkbox')).not.toBeChecked()
+
+    fireEvent.keyDown(window, { key: 'Escape' })
+    await vi.waitFor(() => expect(screen.queryAllByTestId('topic-select-checkbox')).toHaveLength(0))
+  })
+
+  it('keeps unchecked rows unfilled in multi-select mode and fills only checked rows', async () => {
+    renderTopicList()
+    expect(getTopicRow('Alpha topic')).toHaveClass('bg-resource-list-row-selected')
+
+    await enterMultiSelect()
+    expect(getTopicRow('Alpha topic')).not.toHaveClass('bg-resource-list-row-selected')
+    expect(getTopicRow('Alpha topic')).not.toHaveClass('bg-resource-list-row-active')
+    expect(getTopicRow('Gamma topic')).not.toHaveClass('bg-resource-list-row-selected')
+
+    fireEvent.click(within(getTopicRow('Gamma topic')).getByTestId('topic-select-checkbox'))
+    expect(getTopicRow('Gamma topic')).toHaveAttribute('data-multi-selected', 'true')
+    expect(getTopicRow('Gamma topic')).toHaveClass('bg-resource-list-row-selected')
+    expect(getTopicRow('Alpha topic')).not.toHaveClass('bg-resource-list-row-selected')
+  })
+
+  it('fills only the open conversation row, not the keyboard-active row', () => {
+    renderTopicList()
+
+    fireEvent.keyDown(screen.getByRole('listbox'), { key: 'ArrowDown' })
+
+    const activeRow = document.querySelector('[data-active-descendant="true"]')
+    expect(activeRow).not.toBeNull()
+    expect(activeRow).not.toHaveClass('bg-resource-list-row-active')
+    expect(getTopicRow('Alpha topic')).toHaveClass('bg-resource-list-row-selected')
+  })
+
+  it('grays out share actions while multiple topics are selected', async () => {
+    renderTopicList()
+    await enterMultiSelect()
+
+    fireEvent.contextMenu(getByRowText('Alpha topic'))
+    const menuContent = getByRowText('Alpha topic')
+      .closest('[data-testid="context-menu"]')
+      ?.querySelector('[data-testid="context-menu-content"]') as HTMLElement
+
+    for (const label of ['Save to notes', 'Save to knowledge base', 'Export', 'Copy']) {
+      expect(within(menuContent).getByText(label).closest('button')).toBeDisabled()
+    }
+  })
+
+  it('clears messages for every checked topic and leaves multi-select after the action', async () => {
+    renderTopicList()
+    await enterMultiSelect()
+
+    fireEvent.click(within(getTopicRow('Alpha topic')).getByTestId('topic-select-checkbox'))
+    fireEvent.click(within(getTopicRow('Gamma topic')).getByTestId('topic-select-checkbox'))
+
+    fireEvent.contextMenu(getByRowText('Alpha topic'))
+    const menuContent = getByRowText('Alpha topic')
+      .closest('[data-testid="context-menu"]')
+      ?.querySelector('[data-testid="context-menu-content"]') as HTMLElement
+    fireEvent.click(within(menuContent).getByRole('button', { name: 'Clear messages' }))
+
+    await vi.waitFor(() => {
+      expect(topicDataMocks.clearTopicMessagesTrigger).toHaveBeenCalledTimes(2)
+    })
+    expect(topicDataMocks.clearTopicMessagesTrigger).toHaveBeenNthCalledWith(1, { params: { topicId: 'topic-a' } })
+    expect(topicDataMocks.clearTopicMessagesTrigger).toHaveBeenNthCalledWith(2, { params: { topicId: 'topic-c' } })
+    await vi.waitFor(() => expect(screen.queryAllByTestId('topic-select-checkbox')).toHaveLength(0))
+  })
+
+  it('acts only on checked topics when the context menu is opened on an unchecked row', async () => {
+    renderTopicList()
+    await enterMultiSelect()
+
+    fireEvent.click(within(getTopicRow('Alpha topic')).getByTestId('topic-select-checkbox'))
+
+    fireEvent.contextMenu(getByRowText('Gamma topic'))
+    const menuContent = getByRowText('Gamma topic')
+      .closest('[data-testid="context-menu"]')
+      ?.querySelector('[data-testid="context-menu-content"]') as HTMLElement
+    fireEvent.click(within(menuContent).getByRole('button', { name: 'Clear messages' }))
+
+    await vi.waitFor(() =>
+      expect(topicDataMocks.clearTopicMessagesTrigger).toHaveBeenCalledExactlyOnceWith({
+        params: { topicId: 'topic-a' }
+      })
+    )
+  })
+
+  it('moves every checked topic to the chosen assistant', async () => {
+    topicDataMocks.batchUpdateTopics.mockResolvedValue([
+      { status: 'fulfilled', value: undefined },
+      { status: 'fulfilled', value: undefined }
+    ])
+    renderTopicList()
+    await enterMultiSelect()
+
+    fireEvent.click(within(getTopicRow('Alpha topic')).getByTestId('topic-select-checkbox'))
+    fireEvent.click(within(getTopicRow('Gamma topic')).getByTestId('topic-select-checkbox'))
+
+    fireEvent.contextMenu(getByRowText('Alpha topic'))
+    const menuContent = getByRowText('Alpha topic')
+      .closest('[data-testid="context-menu"]')
+      ?.querySelector('[data-testid="context-menu-content"]') as HTMLElement
+    fireEvent.click(within(menuContent).getByRole('button', { name: /Beta Assistant/ }))
+
+    await vi.waitFor(() =>
+      expect(topicDataMocks.batchUpdateTopics).toHaveBeenCalledWith([
+        { id: 'topic-a', dto: { assistantId: 'assistant-2' } },
+        { id: 'topic-c', dto: { assistantId: 'assistant-2' } }
+      ])
+    )
+    await vi.waitFor(() => expect(screen.queryAllByTestId('topic-select-checkbox')).toHaveLength(0))
+  })
+
+  it('renames checked topics from the topmost row with a space and an increasing index', async () => {
+    topicDataMocks.batchUpdateTopics.mockResolvedValue([
+      { status: 'fulfilled', value: undefined },
+      { status: 'fulfilled', value: undefined }
+    ])
+    renderTopicList()
+    await enterMultiSelect()
+
+    fireEvent.click(within(getTopicRow('Alpha topic')).getByTestId('topic-select-checkbox'))
+    fireEvent.click(within(getTopicRow('Gamma topic')).getByTestId('topic-select-checkbox'))
+
+    fireEvent.contextMenu(getByRowText('Gamma topic'))
+    const menuContent = getByRowText('Gamma topic')
+      .closest('[data-testid="context-menu"]')
+      ?.querySelector('[data-testid="context-menu-content"]') as HTMLElement
+    fireEvent.click(within(menuContent).getByRole('button', { name: 'Edit conversation name' }))
+
+    const input = await screen.findByLabelText('Edit conversation name')
+    expect(input).toHaveValue('Alpha topic')
+    fireEvent.change(input, { target: { value: 'Project' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+
+    await vi.waitFor(() =>
+      expect(topicDataMocks.batchUpdateTopics).toHaveBeenCalledWith([
+        { id: 'topic-a', dto: { name: 'Project 1', isNameManuallyEdited: true } },
+        { id: 'topic-c', dto: { name: 'Project 2', isNameManuallyEdited: true } }
+      ])
+    )
+    await vi.waitFor(() => expect(screen.queryAllByTestId('topic-select-checkbox')).toHaveLength(0))
+  })
+
+  it('archives every checked topic through one batch request', async () => {
+    topicDataMocks.deleteTopics.mockResolvedValue({ deletedCount: 2, deletedIds: ['topic-a', 'topic-c'] })
+    renderTopicList()
+    await enterMultiSelect()
+
+    fireEvent.click(within(getTopicRow('Alpha topic')).getByTestId('topic-select-checkbox'))
+    fireEvent.click(within(getTopicRow('Gamma topic')).getByTestId('topic-select-checkbox'))
+
+    fireEvent.contextMenu(getByRowText('Alpha topic'))
+    const menuContent = getByRowText('Alpha topic')
+      .closest('[data-testid="context-menu"]')
+      ?.querySelector('[data-testid="context-menu-content"]') as HTMLElement
+    fireEvent.click(within(menuContent).getByRole('button', { name: 'Archive' }))
+
+    await vi.waitFor(() => expect(topicDataMocks.deleteTopics).toHaveBeenCalledExactlyOnceWith(['topic-a', 'topic-c']))
+    expect(recycleBinFeedbackMocks.showRecycleBinBatchUndo).toHaveBeenCalledWith(
+      expect.objectContaining({ itemCount: 2 })
+    )
+    await vi.waitFor(() => expect(screen.queryAllByTestId('topic-select-checkbox')).toHaveLength(0))
   })
 
   it('orders move-to-assistant targets with pinned assistants first', () => {

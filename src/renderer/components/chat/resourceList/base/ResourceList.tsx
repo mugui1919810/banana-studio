@@ -387,12 +387,18 @@ function FilterBar({ className, ref, ...props }: FilterBarProps) {
 }
 
 type ItemProps<T extends ResourceListItemBase> = ComponentProps<'div'> & {
+  /**
+   * Whether the keyboard/roving active row gets the active fill. Lists whose controlled
+   * selection already marks the one open resource can opt out so only that row is filled.
+   */
+  highlightActive?: boolean
   item: T
   ref?: Ref<HTMLDivElement>
   tooltip?: ReactNode
 }
 
 function Item<T extends ResourceListItemBase>({
+  highlightActive = true,
   item,
   children,
   className,
@@ -427,7 +433,7 @@ function Item<T extends ResourceListItemBase>({
         RESOURCE_LIST_VISUAL_ROW_CLASS,
         RESOURCE_LIST_INTERACTIVE_ROW_CLASS,
         !rowState.active && !rowState.selected && RESOURCE_LIST_DESCENDANT_FOCUS_ROW_CLASS,
-        rowState.active && !rowState.selected && RESOURCE_LIST_ACTIVE_ROW_CLASS,
+        highlightActive && rowState.active && !rowState.selected && RESOURCE_LIST_ACTIVE_ROW_CLASS,
         rowState.selected && RESOURCE_LIST_SELECTED_ROW_CLASS,
         rowState.revealFocused && 'animation-resource-list-reveal-focus',
         className

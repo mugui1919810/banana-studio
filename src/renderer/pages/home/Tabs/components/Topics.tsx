@@ -4,7 +4,7 @@ import type { RefObject } from 'react'
 import { lazy, memo, Suspense, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { useTranslation } from 'react-i18next'
 
-import { Tooltip } from '@cherrystudio/ui'
+import { Checkbox, Tooltip } from '@cherrystudio/ui'
 import { dataApiService } from '@data/DataApiService'
 import { usePersistCache, useSharedCacheSelector } from '@data/hooks/useCache'
 import { useMultiplePreferences, usePreference } from '@data/hooks/usePreference'
@@ -13,7 +13,8 @@ import { actionsToCommandMenuExtraItems } from '@renderer/components/chat/action
 import { ResourceListActionContextMenu } from '@renderer/components/chat/actions/ResourceListActionContextMenu'
 import type {
   TopicExportMenuOptions,
-  TopicMoveAssistantTarget
+  TopicMoveAssistantTarget,
+  TopicMultiSelectionState
 } from '@renderer/components/chat/actions/topicContextMenuActions'
 import { deleteConversationOwnerPopup } from '@renderer/components/chat/DeleteConversationOwnerConfirmDialog'
 import { useOptionalRightPanelActions, useOptionalRightPanelState } from '@renderer/components/chat/panes/Shell'
@@ -96,6 +97,7 @@ import {
   normalizeTopicDropPayload,
   sortTopicsForDisplayGroups,
   TOPIC_ASSISTANT_SECTION_ID,
+  TOPIC_CUSTOM_GROUP_ID,
   TOPIC_PINNED_GROUP_ID,
   TOPIC_UNLINKED_ASSISTANT_GROUP_ID,
   type TopicDisplayMode
@@ -149,6 +151,13 @@ const TOPIC_EXPORT_MENU_PREFERENCE_KEYS = {
   siyuan: 'data.export.menus.siyuan',
   yuque: 'data.export.menus.yuque'
 } as const
+
+const EMPTY_MULTI_SELECTION: TopicMultiSelectionState = Object.freeze({
+  count: 0,
+  allPinned: false,
+  allSidebarPinned: false,
+  allUnpinned: false
+})
 
 interface Props {
   activeTopic?: Topic
@@ -310,7 +319,9 @@ export function Topics({
   const {
     updateTopic: patchTopic,
     deleteTopic: deleteTopicById,
+    deleteTopics,
     deleteTopicsByAssistantId,
+    batchUpdateTopics,
     moveTopic,
     refreshTopics,
     restoreTopic
@@ -333,13 +344,20 @@ export function Topics({
     rejectPendingActions: rejectPendingTopicImageActions
   })
   const [exportMenuOptions] = useMultiplePreferences(TOPIC_EXPORT_MENU_PREFERENCE_KEYS)
-  const displayMode = isRightPanel ? 'time' : (topicDisplayMode ?? 'time')
+  const [rightPanelDisplayMode] = usePreference('topic.right_panel.display_mode')
+  const displayMode: TopicDisplayMode = isRightPanel
+    ? rightPanelDisplayMode === 'custom'
+      ? 'custom'
+      : 'time'
+    : (topicDisplayMode ?? 'time')
   const defaultGroupVisibleCount = isRightPanel
     ? Number.POSITIVE_INFINITY
     : displayMode === 'time'
       ? LEFT_PANEL_TIME_TOPIC_GROUP_VISIBLE_COUNT
       : DEFAULT_TOPIC_GROUP_VISIBLE_COUNT
   const isAssistantDisplayMode = displayMode === 'assistant'
+  const isCustomDisplayMode = displayMode === 'custom'
+  const isDraggableDisplayMode = isAssistantDisplayMode || isCustomDisplayMode
   const topicExpansion = isAssistantDisplayMode ? topicExpansionAssistant : topicExpansionTime
 
   const {
@@ -438,6 +456,11 @@ export function Topics({
   const [deletingAssistantId, setDeletingAssistantId] = useState<string | null>(null)
   const deletingAssistantGroupIdRef = useRef<string | null>(null)
   const [editDialogTarget, setEditDialogTarget] = useState<ResourceEditDialogTarget | null>(null)
+  const [multiSelectMode, setMultiSelectMode] = useState(false)
+  const [selectedTopicIds, setSelectedTopicIds] = useState<ReadonlySet<string>>(() => new Set())
+  const multiSelectModeRef = useRef(false)
+  const selectedTopicIdsRef = useRef<ReadonlySet<string>>(selectedTopicIds)
+  const pendingBatchRenameIdRef = useRef<string | null>(null)
 
   const showTopicImageExportToast = useCallback(
     (request: TopicImageActionRequest) => {
@@ -718,8 +741,6 @@ export function Topics({
     [clearActiveTopic, deleteTopicById, refreshTopics, restoreTopic, setActiveTopic, t]
   )
 
-  const handleClearMessages = useCallback((topic: Topic) => clearTopicMessages(topic.id), [clearTopicMessages])
-
   const handleAutoRename = useCallback(
     async (topic: Topic) => {
       const messages = await getTopicMessages(topic.id)
@@ -837,6 +858,88 @@ export function Topics({
     if (!isRightPanel) return groupedTopics
     return groupedTopics.filter((topic) => matchesAssistantFilter(topic, assistantIdFilter))
   }, [assistantIdFilter, groupedTopics, isRightPanel])
+  const updateSelectedTopicIds = useCallback((next: ReadonlySet<string>) => {
+    selectedTopicIdsRef.current = next
+    setSelectedTopicIds(next)
+  }, [])
+  const exitMultiSelect = useCallback(() => {
+    multiSelectModeRef.current = false
+    pendingBatchRenameIdRef.current = null
+    updateSelectedTopicIds(new Set())
+    setMultiSelectMode(false)
+  }, [updateSelectedTopicIds])
+  const handleToggleMultiSelect = useCallback(() => {
+    if (multiSelectModeRef.current) {
+      exitMultiSelect()
+      return
+    }
+
+    multiSelectModeRef.current = true
+    pendingBatchRenameIdRef.current = null
+    updateSelectedTopicIds(new Set())
+    setMultiSelectMode(true)
+  }, [exitMultiSelect, updateSelectedTopicIds])
+  const handleToggleTopicSelection = useCallback(
+    (topicId: string, selected: boolean) => {
+      const current = selectedTopicIdsRef.current
+      if (current.has(topicId) === selected) return
+
+      const next = new Set(current)
+      if (selected) next.add(topicId)
+      else next.delete(topicId)
+      updateSelectedTopicIds(next)
+    },
+    [updateSelectedTopicIds]
+  )
+  const multiSelectedTopics = useMemo(
+    () => (multiSelectMode ? filteredTopics.filter((topic) => selectedTopicIds.has(topic.id)) : []),
+    [filteredTopics, multiSelectMode, selectedTopicIds]
+  )
+  const multiSelectedTopicsRef = useRef<readonly Topic[]>([])
+  useEffect(() => {
+    multiSelectedTopicsRef.current = multiSelectedTopics
+  }, [multiSelectedTopics])
+  const batchRenameAnchorId = multiSelectedTopics[0]?.id ?? null
+  const batchRenameAnchorIdRef = useRef<string | null>(null)
+  useEffect(() => {
+    batchRenameAnchorIdRef.current = batchRenameAnchorId
+  }, [batchRenameAnchorId])
+  const multiSelection = useMemo<TopicMultiSelectionState>(() => {
+    if (multiSelectedTopics.length === 0) return EMPTY_MULTI_SELECTION
+
+    return {
+      count: multiSelectedTopics.length,
+      allPinned: multiSelectedTopics.every((topic) => topic.pinned),
+      allSidebarPinned: multiSelectedTopics.every((topic) => sidebarTopicFavoriteIdSet.has(topic.id)),
+      allUnpinned: multiSelectedTopics.every((topic) => !topic.pinned)
+    }
+  }, [multiSelectedTopics, sidebarTopicFavoriteIdSet])
+  const getMultiTargets = useCallback(
+    (topic: Topic): readonly Topic[] => (multiSelectModeRef.current ? multiSelectedTopicsRef.current : [topic]),
+    []
+  )
+  // A collapsed/filtered-out row leaves the list while checked; drop it so batch
+  // actions never touch rows the user can no longer see.
+  useEffect(() => {
+    if (!multiSelectMode || selectedTopicIds.size === 0) return
+
+    const visibleIds = new Set(filteredTopics.map((topic) => topic.id))
+    const next = new Set([...selectedTopicIds].filter((id) => visibleIds.has(id)))
+    if (next.size !== selectedTopicIds.size) updateSelectedTopicIds(next)
+  }, [filteredTopics, multiSelectMode, selectedTopicIds, updateSelectedTopicIds])
+  useEffect(() => {
+    if (!multiSelectMode) return
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return
+      const target = event.target as HTMLElement | null
+      if (target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA' || target?.isContentEditable) return
+      exitMultiSelect()
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [exitMultiSelect, multiSelectMode])
   // Time mode only: "Earlier" above a list with nothing newer restates the list itself.
   const topicGroupByForDisplay = useMemo(
     () =>
@@ -900,7 +1003,7 @@ export function Topics({
       : visibleFilteredTopics.length === 0
         ? 'empty'
         : 'idle'
-  const dragReady = isAssistantDisplayMode && isFullyLoaded && !isLoadingAll && !isRefreshing
+  const dragReady = isDraggableDisplayMode && isFullyLoaded && !isLoadingAll && !isRefreshing
   const hasActiveCenterSurface = manageAssistantsActive || historyRecordsActive
   const openAssistantEditor = useCallback((assistantId: string) => {
     setEditDialogTarget({ kind: 'assistant', id: assistantId })
@@ -916,6 +1019,269 @@ export function Topics({
       conversationNav.openConversationWindow(topic.id, topic.name)
     },
     [conversationNav]
+  )
+
+  const runBatchRename = useCallback(
+    async (name: string) => {
+      const targets = multiSelectedTopicsRef.current
+      const base = name.trim()
+      if (targets.length === 0 || !base) {
+        exitMultiSelect()
+        return
+      }
+
+      try {
+        const results = await batchUpdateTopics(
+          targets.map((target, index) => ({
+            id: target.id,
+            dto: { name: `${base} ${index + 1}`, isNameManuallyEdited: true }
+          }))
+        )
+        const failed = results.filter((result) => result.status === 'rejected')
+        if (failed.length > 0) {
+          logger.error('Failed to rename selected topics', { failed: failed.length, total: targets.length })
+          const reason = failed[0]?.reason
+          toast.error(reason instanceof Error ? reason.message : t('common.save_failed'))
+        } else {
+          toast.success(t('common.saved'))
+        }
+      } catch (err) {
+        logger.error('Failed to rename selected topics', { err })
+        toast.error(formatErrorMessageWithPrefix(err, t('common.save_failed')))
+      } finally {
+        exitMultiSelect()
+      }
+    },
+    [batchUpdateTopics, exitMultiSelect, t]
+  )
+  const handleRenameItem = useCallback(
+    (topicId: string, name: string) => {
+      if (pendingBatchRenameIdRef.current === topicId) {
+        pendingBatchRenameIdRef.current = null
+        void runBatchRename(name)
+        return
+      }
+
+      handleRenameTopic(topicId, name)
+    },
+    [handleRenameTopic, runBatchRename]
+  )
+  const handleCancelRenameItem = useCallback((topicId: string) => {
+    if (pendingBatchRenameIdRef.current === topicId) pendingBatchRenameIdRef.current = null
+  }, [])
+  const handleBeginBatchRename = useCallback(() => {
+    pendingBatchRenameIdRef.current = batchRenameAnchorIdRef.current
+  }, [])
+  const handleMenuClearMessages = useCallback(
+    async (topic: Topic) => {
+      if (!multiSelectModeRef.current) {
+        await clearTopicMessages(topic.id)
+        return
+      }
+
+      try {
+        for (const target of multiSelectedTopicsRef.current) {
+          await clearTopicMessages(target.id)
+        }
+      } catch (err) {
+        logger.error('Failed to clear messages for selected topics', { err })
+        toast.error(formatErrorMessageWithPrefix(err, t('common.error')))
+      } finally {
+        exitMultiSelect()
+      }
+    },
+    [clearTopicMessages, exitMultiSelect, t]
+  )
+  const handleMenuPinTopic = useCallback(
+    async (topic: Topic) => {
+      if (!multiSelectModeRef.current) {
+        await handlePinTopic(topic)
+        return
+      }
+
+      const targets = multiSelectedTopicsRef.current
+      const shouldPin = !targets.every((target) => target.pinned)
+      if (shouldPin) {
+        setTimeout(() => listRef.current?.scrollTo?.({ top: 0, behavior: 'smooth' }), 50)
+      }
+
+      try {
+        for (const target of targets) {
+          if (target.pinned === shouldPin) continue
+          await toggleTopicPinned(target.id)
+        }
+      } catch (err) {
+        logger.error('Failed to toggle pin for selected topics', { err })
+        toast.error(t('common.error'))
+      } finally {
+        exitMultiSelect()
+      }
+    },
+    [exitMultiSelect, handlePinTopic, t, toggleTopicPinned]
+  )
+  const handleMenuToggleSidebar = useCallback(
+    (topic: Topic) => {
+      if (!multiSelectModeRef.current) {
+        handleToggleTopicSidebar(topic)
+        return
+      }
+
+      const targets = multiSelectedTopicsRef.current
+      const shouldPin = !targets.every((target) => sidebarTopicFavoriteIdSet.has(target.id))
+      for (const target of targets) {
+        if (sidebarTopicFavoriteIdSet.has(target.id) === shouldPin) continue
+
+        setSidebarShortcutPinned(
+          createSidebarShortcutTarget(SIDEBAR_SHORTCUT_PROVIDER_IDS.TOPIC, target.id),
+          shouldPin,
+          target.name.trim() || t('chat.conversation.new')
+        )
+      }
+      exitMultiSelect()
+    },
+    [exitMultiSelect, handleToggleTopicSidebar, setSidebarShortcutPinned, sidebarTopicFavoriteIdSet, t]
+  )
+  const handleMenuMoveToAssistant = useCallback(
+    async (topic: Topic, assistantId: string) => {
+      if (!multiSelectModeRef.current) {
+        await handleMoveTopicToAssistant(topic, assistantId)
+        return
+      }
+
+      const targets = multiSelectedTopicsRef.current
+      if (targets.length === 0) {
+        exitMultiSelect()
+        return
+      }
+
+      try {
+        const results = await batchUpdateTopics(targets.map((target) => ({ id: target.id, dto: { assistantId } })))
+        const moved = targets.filter((_, index) => results[index]?.status === 'fulfilled')
+        const failed = results.length - moved.length
+        const currentActiveTopic = activeTopicRef.current
+        if (currentActiveTopic && moved.some((target) => target.id === currentActiveTopic.id)) {
+          setActiveTopic({ ...currentActiveTopic, assistantId })
+        }
+        if (moved.length > 0) {
+          toast.success(t('chat.topics.manage.move.success', { count: moved.length }))
+        }
+        if (failed > 0) {
+          logger.error('Failed to move selected topics', { assistantId, failed, total: targets.length })
+          toast.error(t('history.records.bulkMoveTopics.error'))
+        }
+      } catch (err) {
+        logger.error('Failed to move selected topics', { assistantId, err })
+        toast.error(formatErrorMessageWithPrefix(err, t('common.error')))
+      } finally {
+        exitMultiSelect()
+      }
+    },
+    [batchUpdateTopics, exitMultiSelect, handleMoveTopicToAssistant, setActiveTopic, t]
+  )
+  const handleMenuDeleteTopic = useCallback(
+    async (topic: Topic) => {
+      if (!multiSelectModeRef.current) {
+        await handleDeleteTopicFromMenu(topic)
+        return
+      }
+
+      const targets = multiSelectedTopicsRef.current
+      if (targets.length === 0) {
+        exitMultiSelect()
+        return
+      }
+
+      const ids = targets.map((target) => target.id)
+      const idSet = new Set(ids)
+      const currentActiveTopicId = activeTopicIdRef.current
+      const replacement =
+        currentActiveTopicId && idSet.has(currentActiveTopicId)
+          ? findLatestActive(topicsRef.current.filter((candidate) => !idSet.has(candidate.id)))
+          : undefined
+
+      try {
+        const result = await deleteTopics(ids)
+        const deletedIds = [...result.deletedIds]
+        if (deletedIds.length === 0) {
+          toast.info(t('recycle_bin.already_moved'))
+          return
+        }
+
+        showRecycleBinBatchUndo({
+          itemCount: deletedIds.length,
+          onUndo: () =>
+            restoreRecycleBinItems({
+              ids: deletedIds,
+              restore: restoreTopic,
+              getActive: (id) => dataApiService.get(`/topics/${id}`),
+              refresh: refreshTopics
+            })
+        })
+        if (currentActiveTopicId && deletedIds.includes(currentActiveTopicId)) {
+          if (replacement) setActiveTopic(replacement)
+          else clearActiveTopic()
+        }
+      } catch (err) {
+        logger.error('Failed to archive selected topics', { err, ids })
+        if (isTrashTargetNotFoundError(err)) toast.info(t('recycle_bin.already_moved'))
+        else if (isTrashTopicBusyError(err)) toast.info(t('recycle_bin.move.blocked_generation'))
+        else toast.error(t('chat.topics.manage.delete.error'))
+      } finally {
+        exitMultiSelect()
+      }
+    },
+    [
+      clearActiveTopic,
+      deleteTopics,
+      exitMultiSelect,
+      handleDeleteTopicFromMenu,
+      refreshTopics,
+      restoreTopic,
+      setActiveTopic,
+      t
+    ]
+  )
+  const handleMenuAutoRename = useCallback(
+    async (topic: Topic) => {
+      if (!multiSelectModeRef.current) {
+        await handleAutoRename(topic)
+        return
+      }
+
+      try {
+        for (const target of multiSelectedTopicsRef.current) {
+          await handleAutoRename(target)
+        }
+      } finally {
+        exitMultiSelect()
+      }
+    },
+    [exitMultiSelect, handleAutoRename]
+  )
+  const handleMenuOpenInNewTab = useCallback(
+    (topic: Topic) => {
+      for (const target of getMultiTargets(topic)) {
+        openTopicInNewTab(target)
+      }
+      if (multiSelectModeRef.current) exitMultiSelect()
+    },
+    [exitMultiSelect, getMultiTargets, openTopicInNewTab]
+  )
+  const handleMenuOpenInNewWindow = useCallback(
+    (topic: Topic) => {
+      for (const target of getMultiTargets(topic)) {
+        openTopicInNewWindow(target)
+      }
+      if (multiSelectModeRef.current) exitMultiSelect()
+    },
+    [exitMultiSelect, getMultiTargets, openTopicInNewWindow]
+  )
+  const handleMenuSetPanePosition = useCallback(
+    async (position: TopicTabPosition) => {
+      await setResolvedPanePosition?.(position)
+      if (multiSelectModeRef.current) exitMultiSelect()
+    },
+    [exitMultiSelect, setResolvedPanePosition]
   )
 
   const handleToggleAssistantPin = useCallback(
@@ -1327,18 +1693,40 @@ export function Topics({
     [activeTopic, filteredTopics, setTopicDisplayMode, setTopicExpansionAssistant]
   )
   const canDragTopicItem = useCallback(
-    ({ item }: { item: Topic }) => isAssistantDisplayMode && !item.pinned,
-    [isAssistantDisplayMode]
+    ({ item }: { item: Topic }) => isDraggableDisplayMode && !item.pinned,
+    [isDraggableDisplayMode]
   )
 
   const canDropTopicItem = useCallback(
-    ({ overItem, targetGroupId }: { overItem?: Topic; targetGroupId: string }) =>
-      isAssistantDisplayMode &&
-      !overItem?.pinned &&
-      targetGroupId !== TOPIC_PINNED_GROUP_ID &&
-      targetGroupId !== TOPIC_UNLINKED_ASSISTANT_GROUP_ID &&
-      resolveAssistantIdForTopicGroup(targetGroupId, assistantById) !== undefined,
-    [assistantById, isAssistantDisplayMode]
+    ({
+      activeItem,
+      overItem,
+      sourceGroupId,
+      targetGroupId
+    }: {
+      activeItem: Topic
+      overItem?: Topic
+      sourceGroupId: string
+      targetGroupId: string
+    }) => {
+      if (isCustomDisplayMode) {
+        return (
+          !activeItem.pinned &&
+          !overItem?.pinned &&
+          sourceGroupId === TOPIC_CUSTOM_GROUP_ID &&
+          targetGroupId === TOPIC_CUSTOM_GROUP_ID
+        )
+      }
+
+      return (
+        isAssistantDisplayMode &&
+        !overItem?.pinned &&
+        targetGroupId !== TOPIC_PINNED_GROUP_ID &&
+        targetGroupId !== TOPIC_UNLINKED_ASSISTANT_GROUP_ID &&
+        resolveAssistantIdForTopicGroup(targetGroupId, assistantById) !== undefined
+      )
+    },
+    [assistantById, isAssistantDisplayMode, isCustomDisplayMode]
   )
 
   const canDragTopicGroup = useCallback(
@@ -1397,6 +1785,34 @@ export function Topics({
 
   const handleTopicReorder = useCallback(
     async (payload: ResourceListReorderPayload) => {
+      if (isCustomDisplayMode) {
+        if (payload.type !== 'item') return
+        if (payload.sourceGroupId !== TOPIC_CUSTOM_GROUP_ID || payload.targetGroupId !== TOPIC_CUSTOM_GROUP_ID) {
+          return
+        }
+
+        const topic = topics.find((candidate) => candidate.id === payload.activeId)
+        if (!topic || topic.pinned) return
+
+        const overTopic =
+          payload.overType === 'item' ? topics.find((candidate) => candidate.id === payload.overId) : undefined
+        if (overTopic?.pinned) return
+
+        const normalizedPayload = normalizeTopicDropPayload(payload)
+        setOptimisticMove({ payload: normalizedPayload, targetAssistantId: topic.assistantId ?? null })
+
+        try {
+          await moveTopic(payload.activeId, {
+            anchor: buildTopicDropAnchor(normalizedPayload)
+          })
+        } catch (err) {
+          setOptimisticMove(null)
+          logger.error('Failed to reorder topic in custom mode', { err, topicId: payload.activeId })
+        }
+
+        return
+      }
+
       if (!isAssistantDisplayMode) return
 
       if (payload.type === 'group') {
@@ -1500,6 +1916,7 @@ export function Topics({
       assistantById,
       assistantGroupById,
       isAssistantDisplayMode,
+      isCustomDisplayMode,
       isGroupGrouping,
       moveTopic,
       orderedAssistants,
@@ -1518,7 +1935,7 @@ export function Topics({
         presentation={presentation}
         items={visibleFilteredTopics}
         status={listStatus}
-        selectedId={hasActiveCenterSurface ? null : activeTopic?.id}
+        selectedId={multiSelectMode || hasActiveCenterSurface ? null : activeTopic?.id}
         groupBy={topicGroupByForDisplay}
         groupSeeds={topicGroupSeeds}
         sectionBy={topicSectionBy}
@@ -1534,10 +1951,10 @@ export function Topics({
         getGroupHeaderKind={getGroupHeaderKind}
         groupHeaderClickBehavior={getGroupHeaderClickBehavior}
         dragCapabilities={{
-          groups: dragReady,
-          items: dragReady,
-          itemSameGroup: dragReady,
-          itemCrossGroup: dragReady
+          groups: isAssistantDisplayMode && dragReady && !multiSelectMode,
+          items: dragReady && !multiSelectMode,
+          itemSameGroup: dragReady && !multiSelectMode,
+          itemCrossGroup: isAssistantDisplayMode && dragReady && !multiSelectMode
         }}
         canDragGroup={canDragTopicGroup}
         canDropGroup={canDropTopicGroup}
@@ -1546,7 +1963,8 @@ export function Topics({
         groupEmptyLabel={t('chat.topics.empty.title')}
         groupShowMoreLabel={isRightPanel ? undefined : t('chat.topics.group.show_more')}
         groupCollapseLabel={isRightPanel ? undefined : t('chat.topics.group.collapse')}
-        onRenameItem={handleRenameTopic}
+        onRenameItem={handleRenameItem}
+        onCancelRenameItem={handleCancelRenameItem}
         onGroupHeaderSelectItem={handleGroupHeaderSelectTopic}
         onReorder={handleTopicReorder}
         onCollapsedStateChange={handleTopicCollapsedStateChange}>
@@ -1614,25 +2032,32 @@ export function Topics({
           <TopicListBody
             activeTopic={activeTopic}
             assistantMoveTargets={assistantMoveTargets}
+            batchRenameAnchorId={batchRenameAnchorId}
             displayMode={displayMode}
             exportMenuOptions={exportMenuOptions}
+            isMultiSelect={multiSelectMode}
             listRef={listRef}
+            multiSelection={multiSelection}
             notesPath={notesPath}
-            onAutoRename={handleAutoRename}
-            onClearMessages={handleClearMessages}
-            onDeleteFromMenu={handleDeleteTopicFromMenu}
-            onOpenInNewTab={tabs && !isWindowFrame ? openTopicInNewTab : undefined}
-            onOpenInNewWindow={tabs ? openTopicInNewWindow : undefined}
-            onMoveToAssistant={handleMoveTopicToAssistant}
-            onPinTopic={handlePinTopic}
-            onToggleSidebar={handleToggleTopicSidebar}
+            onAutoRename={handleMenuAutoRename}
+            onBeginBatchRename={handleBeginBatchRename}
+            onClearMessages={handleMenuClearMessages}
+            onDeleteFromMenu={handleMenuDeleteTopic}
+            onOpenInNewTab={tabs && !isWindowFrame ? handleMenuOpenInNewTab : undefined}
+            onOpenInNewWindow={tabs ? handleMenuOpenInNewWindow : undefined}
+            onMoveToAssistant={handleMenuMoveToAssistant}
+            onPinTopic={handleMenuPinTopic}
+            onToggleSidebar={handleMenuToggleSidebar}
+            onToggleMultiSelect={handleToggleMultiSelect}
+            onToggleTopicSelection={handleToggleTopicSelection}
             onRequestTopicImageAction={handleTopicImageAction}
-            onSetPanePosition={canSetPanePosition ? setResolvedPanePosition : undefined}
+            onSetPanePosition={canSetPanePosition && setResolvedPanePosition ? handleMenuSetPanePosition : undefined}
             onSwitchTopic={setActiveTopic}
             panePosition={canSetPanePosition ? resolvedPanePosition : undefined}
+            selectedTopicIdSet={selectedTopicIds}
             sidebarTopicFavoriteIdSet={sidebarTopicFavoriteIdSet}
             topicsLength={topics.length}
-            variant={isAssistantDisplayMode && !isRightPanel ? 'draggable' : 'plain'}
+            variant={isCustomDisplayMode || (isAssistantDisplayMode && !isRightPanel) ? 'draggable' : 'plain'}
           />
         </SessionHoverPreviewGroup>
 
@@ -1710,11 +2135,15 @@ const useTopicListStreamStatus = (topicId: string): TopicStreamState =>
 interface TopicListBodyProps {
   activeTopic?: Topic
   assistantMoveTargets: readonly TopicMoveAssistantTarget[]
+  batchRenameAnchorId: string | null
   displayMode: TopicDisplayMode
   exportMenuOptions: TopicExportMenuOptions
+  isMultiSelect: boolean
   listRef: RefObject<HTMLDivElement | null>
+  multiSelection: TopicMultiSelectionState
   notesPath: string
   onAutoRename: (topic: Topic) => Promise<void>
+  onBeginBatchRename: () => void
   onClearMessages: (topic: Topic) => void
   onDeleteFromMenu: (topic: Topic) => Promise<void>
   onMoveToAssistant: (topic: Topic, assistantId: string) => void | Promise<void>
@@ -1722,27 +2151,34 @@ interface TopicListBodyProps {
   onOpenInNewWindow?: (topic: Topic) => void
   onPinTopic: (topic: Topic) => Promise<void>
   onToggleSidebar: (topic: Topic) => void
+  onToggleMultiSelect: (topic: Topic) => void
+  onToggleTopicSelection: (topicId: string, selected: boolean) => void
   onRequestTopicImageAction: (type: TopicImageActionType, topic: Topic) => void
   onSetPanePosition?: (position: TopicTabPosition) => void | Promise<void>
   onSwitchTopic: (topic: Topic) => void
   panePosition?: TopicTabPosition
+  selectedTopicIdSet: ReadonlySet<string>
   sidebarTopicFavoriteIdSet: ReadonlySet<string>
   topicsLength: number
   variant: TopicListBodyVariant
 }
 
-type TopicRowSharedProps = Omit<TopicListBodyProps, 'activeTopic' | 'listRef' | 'variant'>
+type TopicRowSharedProps = Omit<TopicListBodyProps, 'activeTopic' | 'listRef' | 'selectedTopicIdSet' | 'variant'>
 
 function TopicListBody(props: TopicListBodyProps) {
   const { t } = useTranslation()
   const {
     activeTopic,
     assistantMoveTargets,
+    batchRenameAnchorId,
     displayMode,
     exportMenuOptions,
+    isMultiSelect,
     listRef,
+    multiSelection,
     notesPath,
     onAutoRename,
+    onBeginBatchRename,
     onClearMessages,
     onDeleteFromMenu,
     onMoveToAssistant,
@@ -1750,10 +2186,13 @@ function TopicListBody(props: TopicListBodyProps) {
     onOpenInNewWindow,
     onPinTopic,
     onToggleSidebar,
+    onToggleMultiSelect,
+    onToggleTopicSelection,
     onRequestTopicImageAction,
     onSetPanePosition,
     onSwitchTopic,
     panePosition,
+    selectedTopicIdSet,
     sidebarTopicFavoriteIdSet,
     topicsLength,
     variant
@@ -1762,10 +2201,14 @@ function TopicListBody(props: TopicListBodyProps) {
   const rowProps = useMemo<TopicRowSharedProps>(
     () => ({
       assistantMoveTargets,
+      batchRenameAnchorId,
       displayMode,
       exportMenuOptions,
+      isMultiSelect,
+      multiSelection,
       notesPath,
       onAutoRename,
+      onBeginBatchRename,
       onClearMessages,
       onDeleteFromMenu,
       onMoveToAssistant,
@@ -1773,6 +2216,8 @@ function TopicListBody(props: TopicListBodyProps) {
       onOpenInNewWindow,
       onPinTopic,
       onToggleSidebar,
+      onToggleMultiSelect,
+      onToggleTopicSelection,
       onRequestTopicImageAction,
       onSetPanePosition,
       onSwitchTopic,
@@ -1782,10 +2227,14 @@ function TopicListBody(props: TopicListBodyProps) {
     }),
     [
       assistantMoveTargets,
+      batchRenameAnchorId,
       displayMode,
       exportMenuOptions,
+      isMultiSelect,
+      multiSelection,
       notesPath,
       onAutoRename,
+      onBeginBatchRename,
       onClearMessages,
       onDeleteFromMenu,
       onMoveToAssistant,
@@ -1793,6 +2242,8 @@ function TopicListBody(props: TopicListBodyProps) {
       onOpenInNewWindow,
       onPinTopic,
       onToggleSidebar,
+      onToggleMultiSelect,
+      onToggleTopicSelection,
       onRequestTopicImageAction,
       onSetPanePosition,
       onSwitchTopic,
@@ -1804,8 +2255,16 @@ function TopicListBody(props: TopicListBodyProps) {
 
   const activeTopicId = activeTopic?.id
   const renderItem = useCallback(
-    (topic: Topic) => <TopicRow key={topic.id} topic={topic} isActive={topic.id === activeTopicId} {...rowProps} />,
-    [activeTopicId, rowProps]
+    (topic: Topic) => (
+      <TopicRow
+        key={topic.id}
+        topic={topic}
+        isActive={topic.id === activeTopicId}
+        isMultiSelected={isMultiSelect && selectedTopicIdSet.has(topic.id)}
+        {...rowProps}
+      />
+    ),
+    [activeTopicId, isMultiSelect, rowProps, selectedTopicIdSet]
   )
 
   return (
@@ -1825,6 +2284,7 @@ function TopicListBody(props: TopicListBodyProps) {
 
 interface TopicRowWithStatusProps extends TopicRowSharedProps {
   isActive: boolean
+  isMultiSelected: boolean
   topic: Topic
 }
 
@@ -1832,11 +2292,16 @@ type TopicRowProps = TopicRowWithStatusProps
 
 const TopicRow = memo(function TopicRow({
   assistantMoveTargets,
+  batchRenameAnchorId,
   displayMode,
   exportMenuOptions,
   isActive,
+  isMultiSelect,
+  isMultiSelected,
+  multiSelection,
   notesPath,
   onAutoRename,
+  onBeginBatchRename,
   onClearMessages,
   onDeleteFromMenu,
   onMoveToAssistant,
@@ -1844,6 +2309,8 @@ const TopicRow = memo(function TopicRow({
   onOpenInNewWindow,
   onPinTopic,
   onToggleSidebar,
+  onToggleMultiSelect,
+  onToggleTopicSelection,
   onRequestTopicImageAction,
   onSetPanePosition,
   onSwitchTopic,
@@ -1893,18 +2360,25 @@ const TopicRow = memo(function TopicRow({
           : null
   const hasTopicStreamIndicator = conversationRowStatus !== null && conversationRowStatus !== 'approval'
   const showPinAction = !rowState.renaming
-  const showLeadingSlot = displayMode !== 'time'
+  const showLeadingSlot = displayMode === 'assistant'
   const canDeleteTopic = !topic.pinned
   const isArchiveBlocked = isTopicStreamPending || isTopicAwaitingApproval
   const [renameDialogOpen, setRenameDialogOpen] = useState(false)
   const startInlineRename = useCallback(() => actions.startRename(topic.id), [actions, topic.id])
   const startMenuRename = useCallback(() => setRenameDialogOpen(true), [])
+  const startBatchRename = useCallback(() => {
+    if (!batchRenameAnchorId) return
+    onBeginBatchRename()
+    actions.startRename(batchRenameAnchorId)
+  }, [actions, batchRenameAnchorId, onBeginBatchRename])
   const submitRenameDialog = useCallback((name: string) => actions.commitRename(topic.id, name), [actions, topic.id])
   const { getMenuActions, handleMenuAction } = useTopicMenuActions({
     exportMenuOptions,
     isArchiveBlocked,
     isActiveInCurrentTab: isActive,
+    isMultiSelect,
     isRenaming,
+    multiSelection,
     notesPath,
     assistantMoveTargets,
     onAutoRename,
@@ -1918,7 +2392,8 @@ const TopicRow = memo(function TopicRow({
     onPinTopic,
     onToggleSidebar,
     onSetPanePosition,
-    onStartRename: startMenuRename,
+    onStartRename: isMultiSelect ? startBatchRename : startMenuRename,
+    onToggleMultiSelect,
     panePosition,
     sidebarPinned: sidebarTopicFavoriteIdSet.has(topic.id),
     t,
@@ -1930,10 +2405,21 @@ const TopicRow = memo(function TopicRow({
   const row = (
     <ResourceList.Item
       item={topic}
+      highlightActive={false}
       data-testid="topic-list-row"
-      className="relative"
+      data-multi-selected={isMultiSelected || undefined}
+      className={cn(
+        'relative',
+        isMultiSelect &&
+          isMultiSelected &&
+          'bg-resource-list-row-selected text-resource-list-row-selected-foreground hover:bg-resource-list-row-selected'
+      )}
       style={{ cursor: 'pointer' }}
       onClick={() => {
+        if (isMultiSelect) {
+          onToggleTopicSelection(topic.id, !isMultiSelected)
+          return
+        }
         if (rightPanelState?.maximized) rightPanelActions?.minimize()
         onSwitchTopic(topic)
       }}>
@@ -1958,7 +2444,7 @@ const TopicRow = memo(function TopicRow({
             )}
             onDoubleClick={(event) => {
               event.stopPropagation()
-              startInlineRename()
+              if (!isMultiSelect) startInlineRename()
             }}>
             {topicName}
           </ResourceList.ItemTitle>
@@ -1972,37 +2458,50 @@ const TopicRow = memo(function TopicRow({
           status={conversationRowStatus}
         />
       )}
-      <ResourceList.ItemActions pinned={topic.pinned && showPinAction}>
-        {showPinAction && (
-          <Tooltip title={topic.pinned ? t('chat.topics.unpin') : t('chat.topics.pin')} delay={500}>
-            <ResourceList.ItemAction
-              aria-label={topic.pinned ? t('chat.topics.unpin') : t('chat.topics.pin')}
-              aria-pressed={topic.pinned}
-              className={cn(topic.pinned && 'text-foreground')}
-              onClick={(event) => {
-                event.stopPropagation()
-                void onPinTopic(topic)
-              }}>
-              <PinIcon size={14} className={cn('size-3.5!', topic.pinned && 'fill-current')} />
-            </ResourceList.ItemAction>
-          </Tooltip>
-        )}
-        {canDeleteTopic && (
-          <Tooltip
-            title={isArchiveBlocked ? t('recycle_bin.move.blocked_generation') : t('common.archive')}
-            delay={500}>
-            <ResourceList.ItemAction
-              aria-label={t('common.archive')}
-              disabled={isArchiveBlocked}
-              onClick={(event) => {
-                event.stopPropagation()
-                if (deleteAction) void handleMenuAction(deleteAction)
-              }}>
-              <Archive size={14} className="size-3.5!" />
-            </ResourceList.ItemAction>
-          </Tooltip>
-        )}
-      </ResourceList.ItemActions>
+      {isMultiSelect && !rowState.renaming && (
+        <Checkbox
+          data-testid="topic-select-checkbox"
+          aria-label={t('common.select')}
+          checked={isMultiSelected}
+          size="sm"
+          className="shrink-0 border-2 data-[state=unchecked]:border-muted-foreground"
+          onClick={(event) => event.stopPropagation()}
+          onCheckedChange={(checked) => onToggleTopicSelection(topic.id, checked === true)}
+        />
+      )}
+      {!isMultiSelect && (
+        <ResourceList.ItemActions pinned={topic.pinned && showPinAction}>
+          {showPinAction && (
+            <Tooltip title={topic.pinned ? t('chat.topics.unpin') : t('chat.topics.pin')} delay={500}>
+              <ResourceList.ItemAction
+                aria-label={topic.pinned ? t('chat.topics.unpin') : t('chat.topics.pin')}
+                aria-pressed={topic.pinned}
+                className={cn(topic.pinned && 'text-foreground')}
+                onClick={(event) => {
+                  event.stopPropagation()
+                  void onPinTopic(topic)
+                }}>
+                <PinIcon size={14} className={cn('size-3.5!', topic.pinned && 'fill-current')} />
+              </ResourceList.ItemAction>
+            </Tooltip>
+          )}
+          {canDeleteTopic && (
+            <Tooltip
+              title={isArchiveBlocked ? t('recycle_bin.move.blocked_generation') : t('common.archive')}
+              delay={500}>
+              <ResourceList.ItemAction
+                aria-label={t('common.archive')}
+                disabled={isArchiveBlocked}
+                onClick={(event) => {
+                  event.stopPropagation()
+                  if (deleteAction) void handleMenuAction(deleteAction)
+                }}>
+                <Archive size={14} className="size-3.5!" />
+              </ResourceList.ItemAction>
+            </Tooltip>
+          )}
+        </ResourceList.ItemActions>
+      )}
     </ResourceList.Item>
   )
 

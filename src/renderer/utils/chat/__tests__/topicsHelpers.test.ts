@@ -297,4 +297,32 @@ describe('Topics helpers', () => {
       }).map((topic) => topic.id)
     ).toEqual(['inserted-before-that', 'inserted-before-first', 'first-created'])
   })
+
+  it('groups custom-mode topics into a header-less group while keeping pinned topics separate', () => {
+    const groupTopic = createTopicDisplayGroupResolver({ mode: 'custom', labels: TOPIC_GROUP_LABELS })
+
+    expect(groupTopic(createTopic({ id: 'pinned', pinned: true }))).toEqual({
+      id: 'topic:pinned',
+      label: 'Pinned'
+    })
+    expect(groupTopic(createTopic({ id: 'custom-1' }))).toEqual({ id: 'topic:custom', label: '' })
+  })
+
+  it('keeps pinned topics first and orders custom topics by persisted orderKey', () => {
+    const topics = [
+      createTopic({ id: 'third', orderKey: 'c0' }),
+      createTopic({ id: 'pinned-b', pinned: true, orderKey: 'z9' }),
+      createTopic({ id: 'first', orderKey: 'a0' }),
+      createTopic({ id: 'pinned-a', pinned: true, orderKey: 'a9' }),
+      createTopic({ id: 'second', orderKey: 'b0' })
+    ]
+
+    expect(sortTopicsForDisplayGroups(topics, { mode: 'custom' }).map((topic) => topic.id)).toEqual([
+      'pinned-b',
+      'pinned-a',
+      'first',
+      'second',
+      'third'
+    ])
+  })
 })

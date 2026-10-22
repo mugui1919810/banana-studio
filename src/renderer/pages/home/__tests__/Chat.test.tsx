@@ -344,4 +344,10 @@ describe('Chat', () => {
 
     expect(screen.getByTestId('conversation-center-state')).toHaveTextContent('empty')
   })
+
+  it('forwards the secondary left pane to the conversation shell', () => {
+    render(<Chat activeTopic={topic} secondaryPane={<div data-testid="secondary-pane" />} />)
+
+    expect(conversationShellProps.current?.secondaryPane).toBeTruthy()
+  })
 })

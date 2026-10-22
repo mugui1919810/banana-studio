@@ -73,6 +73,7 @@ export {
   moveResourceListStringGroupAfterDrop,
   withResourceListGroupIdPrefix
 } from './resourceListReorder'
+export { ConversationListOptionsMenu } from './ConversationListOptionsMenu'
 export { SESSION_DISPLAY_LABEL_KEYS, SessionListOptionsMenu } from './SessionListOptionsMenu'
 export { TopicListOptionsMenu } from './TopicListOptionsMenu'
 export type { UseResourceListPinnedStateOptions, UseResourceListPinnedStateResult } from './useResourceListPinnedState'

@@ -13,9 +13,13 @@ import { PageSidebar } from './PageSidebar'
 import {
   CHAT_SHELL_TRANSITION,
   type ChatPanePosition,
+  getResourceListPaneWidthPolicy,
   getRightPaneWidthPolicy,
   RESOURCE_LIST_PANE_CACHE_KEY,
   RESOURCE_LIST_PANE_WINDOW_CACHE_KEY,
+  RESOURCE_LIST_RIGHT_PANE_CACHE_KEY,
+  RESOURCE_LIST_RIGHT_PANE_DEFAULT_WIDTH,
+  RESOURCE_LIST_RIGHT_PANE_WINDOW_CACHE_KEY,
   type RightPaneWidthPolicy
 } from './paneLayout'
 import { evaluateAutoCollapse, predictCenterWidth } from './paneWidthPolicy'
@@ -25,6 +29,8 @@ import { clampResourceListPaneWidth } from './useResourceListPaneResize'
 interface ChatAppShellBaseProps {
   topBar?: ReactNode
   pane?: ReactNode
+  /** Second left column rendered beside `pane` (assistant rail + conversation column). */
+  secondaryPane?: ReactNode
   paneOpen?: boolean
   panePosition?: ChatPanePosition
   sidePanel?: ReactNode
@@ -82,12 +88,14 @@ function clampPaneStoredWidth(width: number, { minWidth, maxWidth }: RightPaneWi
 function useResourceListAutoCollapse({
   leftPaneOpen,
   listResizing,
+  secondaryPanePresent,
   onPaneAutoCollapseChange,
   paneManualToggle,
   rootRef
 }: {
   leftPaneOpen: boolean
   listResizing: boolean
+  secondaryPanePresent: boolean
   onPaneAutoCollapseChange?: (collapsed: boolean) => void
   paneManualToggle?: PaneManualToggleSignal
   rootRef: RefObject<HTMLDivElement | null>
@@ -96,6 +104,11 @@ function useResourceListAutoCollapse({
   const [storedListWidth] = useWindowScopedPersistCache(
     RESOURCE_LIST_PANE_CACHE_KEY,
     RESOURCE_LIST_PANE_WINDOW_CACHE_KEY
+  )
+  // The conversation column reuses the topic pane's persisted width; hooks stay unconditional.
+  const [storedSecondaryListWidth] = useWindowScopedPersistCache(
+    RESOURCE_LIST_RIGHT_PANE_CACHE_KEY,
+    RESOURCE_LIST_RIGHT_PANE_WINDOW_CACHE_KEY
   )
   // The prediction must size the pane that is actually presented; a list and an artifact
   // have different widths, and reading the wrong one strands the list collapsed.
@@ -129,13 +142,19 @@ function useResourceListAutoCollapse({
   const leftPaneOpenRef = useRef(leftPaneOpen)
   const frozenRef = useRef(frozen)
   const dockedPaneOpenRef = useRef(dockedPaneOpen)
-  const widthsRef = useRef({ listWidth: 0, paneWidth: 0, paneMin: 0 })
+  const widthsRef = useRef({ listWidth: 0, secondaryWidth: 0, paneWidth: 0, paneMin: 0 })
   const onChangeRef = useRef(onPaneAutoCollapseChange)
   leftPaneOpenRef.current = leftPaneOpen
   frozenRef.current = frozen
   dockedPaneOpenRef.current = dockedPaneOpen
   widthsRef.current = {
     listWidth: clampResourceListPaneWidth(storedListWidth ?? 0),
+    secondaryWidth: secondaryPanePresent
+      ? clampResourceListPaneWidth(
+          storedSecondaryListWidth ?? RESOURCE_LIST_RIGHT_PANE_DEFAULT_WIDTH,
+          getResourceListPaneWidthPolicy('topics')
+        )
+      : 0,
     paneWidth: clampPaneStoredWidth(storedPaneWidth ?? 0, paneProfile),
     paneMin: paneProfile.minWidth
   }
@@ -162,6 +181,7 @@ function useResourceListAutoCollapse({
       const predictedCenter = predictCenterWidth({
         shellWidth,
         listWidth: widthsRef.current.listWidth,
+        secondaryWidth: widthsRef.current.secondaryWidth,
         paneOpen: dockedPaneOpenRef.current,
         paneWidth: widthsRef.current.paneWidth,
         paneMin: widthsRef.current.paneMin
@@ -223,7 +243,7 @@ function useResourceListAutoCollapse({
   // is an input too: presets can hold equal widths, and then only the floor moves the verdict.
   useLayoutEffect(() => {
     evaluate()
-  }, [evaluate, storedListWidth, storedPaneWidth, paneProfile.minWidth])
+  }, [evaluate, storedListWidth, storedSecondaryListWidth, secondaryPanePresent, storedPaneWidth, paneProfile.minWidth])
 
   // Unfreeze → evaluate once (hard-blocked by suppression like every deferred pass).
   useLayoutEffect(() => {
@@ -273,6 +293,7 @@ function useResourceListAutoCollapse({
 export function ChatAppShell({
   topBar,
   pane,
+  secondaryPane,
   paneOpen,
   panePosition = 'left',
   main,
@@ -295,6 +316,7 @@ export function ChatAppShell({
 }: ChatAppShellProps) {
   const hasCenterContent = centerContent !== undefined
   const leftPaneOpen = Boolean(paneOpen && panePosition === 'left')
+  const hasSecondaryPane = panePosition === 'left' && secondaryPane != null
   const rightPanelState = useOptionalRightPanelState()
   const composerElevated = useRightPanelComposerElevated()
   // While the right pane maximizes/minimizes, its docked spacer snaps under the
@@ -302,11 +324,13 @@ export function ChatAppShell({
   // wipe as visible scale distortion, so the center reflows instantly instead.
   const centerTransition = rightPanelState?.layoutAnimationPending ? { duration: 0 } : CHAT_SHELL_TRANSITION
   const rootRef = useRef<HTMLDivElement>(null)
-  const [listResizing, setListResizing] = useState(false)
+  const [primaryListResizing, setPrimaryListResizing] = useState(false)
+  const [secondaryListResizing, setSecondaryListResizing] = useState(false)
 
   useResourceListAutoCollapse({
     leftPaneOpen,
-    listResizing,
+    listResizing: primaryListResizing || secondaryListResizing,
+    secondaryPanePresent: hasSecondaryPane,
     onPaneAutoCollapseChange,
     paneManualToggle,
     rootRef
@@ -319,9 +343,19 @@ export function ChatAppShell({
       id={rootId}
       className={cn('relative flex min-w-0 flex-1 flex-col overflow-hidden', rootClassName)}>
       <div id={contentId} className="flex min-w-0 flex-1 shrink flex-row overflow-hidden">
-        <PageSidebar open={leftPaneOpen} onPaneCollapse={onPaneCollapse} onResizingChange={setListResizing}>
+        <PageSidebar open={leftPaneOpen} onPaneCollapse={onPaneCollapse} onResizingChange={setPrimaryListResizing}>
           {panePosition === 'left' ? pane : undefined}
         </PageSidebar>
+
+        {hasSecondaryPane && (
+          <PageSidebar
+            open={leftPaneOpen}
+            paneWidthPreset="topics"
+            onPaneCollapse={onPaneCollapse}
+            onResizingChange={setSecondaryListResizing}>
+            {secondaryPane}
+          </PageSidebar>
+        )}
 
         <div data-chat-app-shell-main-region className="relative flex min-w-0 flex-1 overflow-hidden">
           <div className="relative flex min-w-0 flex-1 flex-col">

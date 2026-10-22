@@ -64,6 +64,7 @@ const TOPIC_TIME_BUCKET_RANK: Record<ResourceListTimeBucket, number> = {
 }
 
 export const TOPIC_PINNED_GROUP_ID = 'topic:pinned'
+export const TOPIC_CUSTOM_GROUP_ID = 'topic:custom'
 export const TOPIC_ASSISTANT_SECTION_ID = 'topic:section:assistant'
 export const TOPIC_UNLINKED_ASSISTANT_GROUP_ID = 'topic:assistant:unknown'
 
@@ -211,6 +212,12 @@ export function createTopicDisplayGroupResolver<T extends Pick<Topic, 'assistant
     )
   }
 
+  if (mode === 'custom') {
+    return withTopicGroupIdPrefix(
+      composeResourceListGroupResolvers(pinnedResolver, () => ({ id: 'custom', label: '' }))
+    )
+  }
+
   return withTopicGroupIdPrefix((topic) => {
     const assistantId = topic.assistantId
 
@@ -256,6 +263,19 @@ export function sortTopicsForDisplayGroups<T extends Pick<Topic, 'assistantId' |
         if (a.rank !== b.rank) return a.rank - b.rank
         if (a.topic.pinned !== b.topic.pinned) return a.topic.pinned ? -1 : 1
         if (a.topic.pinned && b.topic.pinned) return a.index - b.index
+        return (
+          compareResourceOrderKey(readOptionalOrderKey(a.topic), readOptionalOrderKey(b.topic)) || a.index - b.index
+        )
+      })
+      .map(({ topic }) => topic)
+  }
+
+  if (options.mode === 'custom') {
+    return topics
+      .map((topic, index) => ({ topic, index }))
+      .sort((a, b) => {
+        if (a.topic.pinned !== b.topic.pinned) return a.topic.pinned ? -1 : 1
+        if (a.topic.pinned) return a.index - b.index
         return (
           compareResourceOrderKey(readOptionalOrderKey(a.topic), readOptionalOrderKey(b.topic)) || a.index - b.index
         )
