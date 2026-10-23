@@ -585,8 +585,8 @@ topicActionRegistry.registerAction({
   group: 'danger',
   order: 90,
   surface: 'menu',
-  // Deleting the last topic is allowed: the handler selects a neighbour when one exists and
-  // otherwise clears the active topic. Pinned topics must be unpinned before they can be deleted.
+  // Deleting the last topic is allowed: the handler selects the first remaining topic of the
+  // same assistant, otherwise creates a new conversation. Pinned topics must be unpinned first.
   availability: ({ isArchiveBlocked, isMultiSelect, multiSelection, t, topic }) => {
     const visible = isMultiSelect ? multiSelection.count > 0 && !multiSelection.allPinned : !topic.pinned
     const enabled = isMultiSelect

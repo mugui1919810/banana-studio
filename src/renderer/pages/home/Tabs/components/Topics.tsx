@@ -103,7 +103,7 @@ import {
   type TopicDisplayMode
 } from '@renderer/utils/chat/topicsHelpers'
 import { formatErrorMessageWithPrefix } from '@renderer/utils/error'
-import { findLatestActive, pickNeighbourAfterRemoval } from '@renderer/utils/resourceEntity'
+import { findLatestActive } from '@renderer/utils/resourceEntity'
 import { createSidebarShortcutTarget, SIDEBAR_SHORTCUT_PROVIDER_IDS } from '@renderer/utils/sidebar'
 import { cn } from '@renderer/utils/style'
 import { classifyTurn, type TopicStatusSnapshotEntry } from '@shared/ai/transport'
@@ -512,6 +512,7 @@ export function Topics({
     [orderSignature, topicPinnedIds]
   )
   const topicsRef = useRef(topics)
+  const groupedTopicsRef = useRef<readonly Topic[]>([])
   const activeTopicRef = useRef(activeTopic)
   const activeTopicIdRef = useRef(activeTopic?.id ?? '')
 
@@ -699,12 +700,9 @@ export function Topics({
   const handleDeleteTopicFromMenu = useCallback(
     async (topic: Topic) => {
       const wasActiveAtStart = topic.id === activeTopicIdRef.current
-      const assistantTopicsBeforeDelete = topicsRef.current.filter(
-        (candidate) => candidate.assistantId === topic.assistantId
+      const replacement = groupedTopicsRef.current.find(
+        (candidate) => candidate.assistantId === topic.assistantId && candidate.id !== topic.id
       )
-      const replacement =
-        pickNeighbourAfterRemoval(assistantTopicsBeforeDelete, topic.id) ??
-        findLatestActive(topicsRef.current.filter((candidate) => candidate.id !== topic.id))
 
       try {
         await deleteTopicById(topic.id)
@@ -723,6 +721,7 @@ export function Topics({
       const shouldReplaceSelection = (!currentActiveTopicId && wasActiveAtStart) || currentActiveTopicId === topic.id
       if (shouldReplaceSelection) {
         if (replacement) setActiveTopic(replacement)
+        else if (onNewTopic) void onNewTopic({ assistantId: topic.assistantId ?? null })
         else clearActiveTopic()
       }
 
@@ -738,7 +737,7 @@ export function Topics({
           })
       })
     },
-    [clearActiveTopic, deleteTopicById, refreshTopics, restoreTopic, setActiveTopic, t]
+    [clearActiveTopic, deleteTopicById, onNewTopic, refreshTopics, restoreTopic, setActiveTopic, t]
   )
 
   const handleAutoRename = useCallback(
@@ -853,6 +852,10 @@ export function Topics({
         : baseGroupedTopics,
     [baseGroupedTopics, optimisticMove, topicGroupBy]
   )
+
+  useEffect(() => {
+    groupedTopicsRef.current = groupedTopics
+  }, [groupedTopics])
 
   const filteredTopics = useMemo(() => {
     if (!isRightPanel) return groupedTopics
@@ -1194,10 +1197,15 @@ export function Topics({
       const ids = targets.map((target) => target.id)
       const idSet = new Set(ids)
       const currentActiveTopicId = activeTopicIdRef.current
-      const replacement =
+      const activeTopicToReplace =
         currentActiveTopicId && idSet.has(currentActiveTopicId)
-          ? findLatestActive(topicsRef.current.filter((candidate) => !idSet.has(candidate.id)))
+          ? topicsRef.current.find((candidate) => candidate.id === currentActiveTopicId)
           : undefined
+      const replacement = activeTopicToReplace
+        ? groupedTopicsRef.current.find(
+            (candidate) => candidate.assistantId === activeTopicToReplace.assistantId && !idSet.has(candidate.id)
+          )
+        : undefined
 
       try {
         const result = await deleteTopics(ids)
@@ -1219,6 +1227,8 @@ export function Topics({
         })
         if (currentActiveTopicId && deletedIds.includes(currentActiveTopicId)) {
           if (replacement) setActiveTopic(replacement)
+          else if (activeTopicToReplace && onNewTopic)
+            void onNewTopic({ assistantId: activeTopicToReplace.assistantId ?? null })
           else clearActiveTopic()
         }
       } catch (err) {
@@ -1235,6 +1245,7 @@ export function Topics({
       deleteTopics,
       exitMultiSelect,
       handleDeleteTopicFromMenu,
+      onNewTopic,
       refreshTopics,
       restoreTopic,
       setActiveTopic,

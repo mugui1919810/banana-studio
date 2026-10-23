@@ -1309,7 +1309,7 @@ describe('Topics', () => {
     expect(findHoverCard('Renamable topic')).toBeUndefined()
   })
 
-  it('clears the active topic after deleting the final remaining topic', async () => {
+  it('creates a new conversation after deleting the final remaining topic', async () => {
     mockUseInfiniteQuery.mockReturnValue({
       pages: [
         {
@@ -1341,11 +1341,11 @@ describe('Topics', () => {
     deleteTopicRow(topicRow)
 
     await vi.waitFor(() => expect(topicDataMocks.deleteTopic).toHaveBeenCalledWith('topic-a'))
-    await vi.waitFor(() => expect(clearActiveTopic).toHaveBeenCalledOnce())
-    expect(onNewTopic).not.toHaveBeenCalled()
+    await vi.waitFor(() => expect(onNewTopic).toHaveBeenCalledWith({ assistantId: 'assistant-1' }))
+    expect(clearActiveTopic).not.toHaveBeenCalled()
   })
 
-  it('deleting the last unlinked topic selects the latest remaining topic instead of seeding a new unlinked one', async () => {
+  it('creates an unlinked conversation when the last unlinked topic is deleted', async () => {
     mockUseInfiniteQuery.mockReturnValue({
       pages: [
         {
@@ -1387,13 +1387,13 @@ describe('Topics', () => {
     deleteTopicRow(topicRow)
 
     await vi.waitFor(() => expect(topicDataMocks.deleteTopic).toHaveBeenCalledWith('topic-unlinked'))
-    // The unlinked assistant group is a display fallback, not a real assistant: deleting its last
-    // topic must not seed a fresh unlinked topic. Fall back to the latest remaining topic instead.
-    await vi.waitFor(() => expect(setActiveTopic).toHaveBeenCalledWith(expect.objectContaining({ id: 'topic-a' })))
-    expect(onNewTopic).not.toHaveBeenCalled()
+    // The unlinked group has no remaining conversation, so it gets a fresh unlinked one
+    // instead of jumping into another assistant's list.
+    await vi.waitFor(() => expect(onNewTopic).toHaveBeenCalledWith({ assistantId: null }))
+    expect(setActiveTopic).not.toHaveBeenCalled()
   })
 
-  it('deleting the sole unlinked topic clears the active selection', async () => {
+  it('creates a new unlinked conversation when the sole unlinked topic is deleted', async () => {
     mockUseInfiniteQuery.mockReturnValue({
       pages: [
         {
@@ -1425,8 +1425,8 @@ describe('Topics', () => {
     deleteTopicRow(topicRow)
 
     await vi.waitFor(() => expect(topicDataMocks.deleteTopic).toHaveBeenCalledWith('topic-unlinked'))
-    await vi.waitFor(() => expect(clearActiveTopic).toHaveBeenCalledOnce())
-    expect(onNewTopic).not.toHaveBeenCalled()
+    await vi.waitFor(() => expect(onNewTopic).toHaveBeenCalledWith({ assistantId: null }))
+    expect(clearActiveTopic).not.toHaveBeenCalled()
   })
 
   it('requests and auto-paginates full topic pages with the ResourceList bulk page size', async () => {
@@ -1955,7 +1955,7 @@ describe('Topics', () => {
 
   it('archives every checked topic through one batch request', async () => {
     topicDataMocks.deleteTopics.mockResolvedValue({ deletedCount: 2, deletedIds: ['topic-a', 'topic-c'] })
-    renderTopicList()
+    const { setActiveTopic } = renderTopicList()
     await enterMultiSelect()
 
     fireEvent.click(within(getTopicRow('Alpha topic')).getByTestId('topic-select-checkbox'))
@@ -1971,6 +1971,7 @@ describe('Topics', () => {
     expect(recycleBinFeedbackMocks.showRecycleBinBatchUndo).toHaveBeenCalledWith(
       expect.objectContaining({ itemCount: 2 })
     )
+    await vi.waitFor(() => expect(setActiveTopic).toHaveBeenCalledWith(expect.objectContaining({ id: 'topic-b' })))
     await vi.waitFor(() => expect(screen.queryAllByTestId('topic-select-checkbox')).toHaveLength(0))
   })
 
@@ -2441,7 +2442,7 @@ describe('Topics', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
-  it('selects the same assistant neighbouring topic after deleting the active topic in the right panel', async () => {
+  it('selects the first topic of the same assistant after deleting the active topic in the right panel', async () => {
     mockUseInfiniteQuery.mockReturnValue({
       pages: [
         {
@@ -2499,7 +2500,7 @@ describe('Topics', () => {
     expect(setActiveTopic).not.toHaveBeenCalledWith(expect.objectContaining({ id: 'topic-a2-first' }))
   })
 
-  it('selects the same-assistant neighbour, not a global one, after deleting the active topic in the modern sidebar', async () => {
+  it('selects the same assistant first topic, not a global one, after deleting the active topic in the modern sidebar', async () => {
     mockUseInfiniteQuery.mockReturnValue({
       pages: [
         {
@@ -2555,6 +2556,17 @@ describe('Topics', () => {
     expect(setActiveTopic).not.toHaveBeenCalledWith(expect.objectContaining({ id: 'topic-a2-first' }))
   })
 
+  it('selects the first topic of the current assistant, including pinned ones, after archiving the active topic', async () => {
+    const { setActiveTopic } = renderTopicList({
+      activeTopic: createRendererTopic({ id: 'topic-a', assistantId: 'assistant-1', name: 'Alpha topic' })
+    })
+
+    deleteTopicRow(getTopicRow('Alpha topic'))
+
+    await vi.waitFor(() => expect(topicDataMocks.deleteTopic).toHaveBeenCalledWith('topic-a'))
+    await vi.waitFor(() => expect(setActiveTopic).toHaveBeenCalledWith(expect.objectContaining({ id: 'topic-b' })))
+  })
+
   it('uses the pre-delete topic snapshot when refresh completes before deletion resolves', async () => {
     const topics = [
       createApiTopic({
@@ -2603,7 +2615,7 @@ describe('Topics', () => {
     expect(onNewTopic).not.toHaveBeenCalled()
   })
 
-  it('reselects the pre-delete neighbour when the active topic collapses while deletion is in flight', async () => {
+  it('reselects the pre-delete first topic when the active topic collapses while deletion is in flight', async () => {
     // #19583: the deleted topic's broadcast-triggered by-id refetch 404s while DELETE is
     // still resolving, activeTopic collapses to undefined and the ref mirror becomes ''.
     // The post-delete guard must judge with the selection captured at delete start, not
@@ -2685,7 +2697,7 @@ describe('Topics', () => {
     expect(clearActiveTopic).not.toHaveBeenCalled()
   })
 
-  it('switches to the latest topic from another assistant after deleting an assistant last topic', async () => {
+  it('creates a new conversation when deleting an assistant last topic', async () => {
     mockUseInfiniteQuery.mockReturnValue({
       pages: [
         {
@@ -2735,10 +2747,8 @@ describe('Topics', () => {
     deleteTopicRow(topicRow as HTMLElement)
 
     await vi.waitFor(() => expect(topicDataMocks.deleteTopic).toHaveBeenCalledWith('topic-a1'))
-    await vi.waitFor(() =>
-      expect(setActiveTopic).toHaveBeenCalledWith(expect.objectContaining({ id: 'topic-b-latest' }))
-    )
-    expect(onNewTopic).not.toHaveBeenCalled()
+    await vi.waitFor(() => expect(onNewTopic).toHaveBeenCalledWith({ assistantId: 'assistant-1' }))
+    expect(setActiveTopic).not.toHaveBeenCalled()
   })
 
   it('reselects a live replacement when the selection switches into the assistant delete set mid-delete', async () => {
@@ -2814,7 +2824,7 @@ describe('Topics', () => {
     await vi.waitFor(() => expect(setActiveTopic).toHaveBeenCalledWith(expect.objectContaining({ id: 'topic-b-live' })))
   })
 
-  it('switches to another assistant latest topic after deleting the active assistant last topic in the right panel', async () => {
+  it('creates a new conversation after deleting the active assistant last topic in the right panel', async () => {
     mockUseInfiniteQuery.mockReturnValue({
       pages: [
         {
@@ -2858,10 +2868,8 @@ describe('Topics', () => {
     deleteTopicRow(topicRow as HTMLElement)
 
     await vi.waitFor(() => expect(topicDataMocks.deleteTopic).toHaveBeenCalledWith('topic-a1-only'))
-    await vi.waitFor(() =>
-      expect(setActiveTopic).toHaveBeenCalledWith(expect.objectContaining({ id: 'topic-a2-first' }))
-    )
-    expect(onNewTopic).not.toHaveBeenCalled()
+    await vi.waitFor(() => expect(onNewTopic).toHaveBeenCalledWith({ assistantId: 'assistant-1' }))
+    expect(setActiveTopic).not.toHaveBeenCalled()
   })
 
   it('renders only the title field in sidebar topic rows', () => {
