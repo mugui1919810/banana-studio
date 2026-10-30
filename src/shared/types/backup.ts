@@ -63,3 +63,45 @@ export const BACKUP_BACKGROUND_TASKS_ERROR_CODE = 'BACKUP_BACKGROUND_TASKS'
 export const BACKUP_DISK_FULL_ERROR_CODE = 'BACKUP_DISK_FULL'
 export const BACKUP_NEWER_VERSION_ERROR_CODE = 'BACKUP_NEWER_VERSION'
 export const BACKUP_OPERATION_BUSY_ERROR_CODE = 'BACKUP_OPERATION_BUSY'
+
+export const CONVERSATION_RESTORE_UNSUPPORTED_FORMAT_ERROR_CODE = 'CONVERSATION_RESTORE_UNSUPPORTED_FORMAT'
+export const CONVERSATION_RESTORE_UNREADABLE_ERROR_CODE = 'CONVERSATION_RESTORE_UNREADABLE'
+export const CONVERSATION_RESTORE_ACTIVE_WRITERS_ERROR_CODE = 'CONVERSATION_RESTORE_ACTIVE_WRITERS'
+export const CONVERSATION_RESTORE_PENDING_RESTORE_ERROR_CODE = 'CONVERSATION_RESTORE_PENDING_RESTORE'
+
+export const CONVERSATION_RESTORE_REASONS = [
+  'unsupported_format',
+  'not_cherry_backup',
+  'missing_database',
+  'unreadable_database',
+  'missing_tables',
+  'unreadable_message_data',
+  'no_conversations',
+  'backup_changed'
+] as const
+
+export type ConversationRestoreReason = (typeof CONVERSATION_RESTORE_REASONS)[number]
+
+export type ConversationRestoreInspection =
+  | {
+      ok: true
+      sourceHash: string
+      sourceAppVersion?: string
+      topicCount: number
+      messageCount: number
+      assistantCount: number
+    }
+  | { ok: false; reason: ConversationRestoreReason; detail?: string }
+
+export type ConversationRestoreOptions = {
+  backupPath: string
+  sourceHash: string
+  keepExistingAssistants: boolean
+}
+
+export type ConversationRestoreResult = {
+  topicsImported: number
+  messagesImported: number
+  assistantsCreated: number
+  deletedAssistants: number
+}

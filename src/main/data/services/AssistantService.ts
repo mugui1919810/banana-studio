@@ -33,10 +33,11 @@ import { modelService } from './ModelService'
 import { pinService } from './PinService'
 import { promptService } from './PromptService'
 import { topicService } from './TopicService'
-import { applyMoves, insertWithOrderKey } from './utils/orderKey'
+import { applyMoves, insertManyWithOrderKey, insertWithOrderKey } from './utils/orderKey'
 import { nullsToUndefined, timestampToISO } from './utils/rowMappers'
 
 const logger = loggerService.withContext('DataApi:AssistantService')
+const SQLITE_INARRAY_CHUNK = 500
 
 type AssistantRow = typeof assistantTable.$inferSelect
 
@@ -424,6 +425,41 @@ export class AssistantDataService {
       },
       modelName
     )
+  }
+
+  /**
+   * Bulk insert assistants inside a caller-owned transaction. Used by the
+   * conversation restore pipeline, which already resolved model/group FKs.
+   */
+  importManyTx(tx: DbOrTx, valuesList: Array<Omit<typeof assistantTable.$inferInsert, 'orderKey'>>): AssistantRow[] {
+    return insertManyWithOrderKey(tx, assistantTable, valuesList, {
+      pkColumn: assistantTable.id,
+      position: 'first',
+      scope: isNull(assistantTable.deletedAt)
+    }) as AssistantRow[]
+  }
+
+  /** Permanently delete assistants and their dependent bindings inside a caller-owned transaction. */
+  purgeManyPermanentlyTx(tx: DbOrTx, ids: string[]): string[] {
+    const uniqueIds = [...new Set(ids)]
+    if (uniqueIds.length === 0) return []
+
+    const deletedIds: string[] = []
+    for (let i = 0; i < uniqueIds.length; i += SQLITE_INARRAY_CHUNK) {
+      const rows = tx
+        .delete(assistantTable)
+        .where(inArray(assistantTable.id, uniqueIds.slice(i, i + SQLITE_INARRAY_CHUNK)))
+        .returning({ id: assistantTable.id })
+        .all()
+      deletedIds.push(...rows.map((row) => row.id))
+    }
+
+    for (const id of deletedIds) {
+      pinService.purgeForEntityTx(tx, 'assistant', id)
+      promptService.purgeForTargetTx(tx, 'assistant', id)
+    }
+
+    return deletedIds
   }
 
   duplicate(id: string, dto: DuplicateAssistantDto): Assistant {

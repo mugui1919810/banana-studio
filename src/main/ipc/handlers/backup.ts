@@ -1,4 +1,5 @@
 import { application } from '@application'
+import { conversationRestoreService } from '@main/services/ConversationRestoreService'
 import type { backupRequestSchemas } from '@shared/ipc/schemas/backup'
 import type { IpcHandlersFor } from '@shared/ipc/types'
 
@@ -9,5 +10,7 @@ export const backupHandlers: IpcHandlersFor<typeof backupRequestSchemas> = {
   },
   'backup.manual_completion.record': async ({ type }) => {
     application.get('AutoBackupService').recordManualBackupCompletion(type)
-  }
+  },
+  'backup.inspect_conversations': async ({ backupPath }) => conversationRestoreService.inspect(backupPath),
+  'backup.restore_conversations': async (options) => conversationRestoreService.restore(options)
 }

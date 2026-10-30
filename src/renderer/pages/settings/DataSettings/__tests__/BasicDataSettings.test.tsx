@@ -36,6 +36,7 @@ vi.mock('@renderer/components/SettingsPrimitives', () => ({
 
 vi.mock('../BackupPopup', () => ({ default: { show: vi.fn() } }))
 vi.mock('../RestorePopup', () => ({ default: { show: vi.fn() } }))
+vi.mock('../RestoreConversationsPopup', () => ({ default: { show: vi.fn() } }))
 vi.mock('../V1RemigrationPopup', () => ({ default: { show: vi.fn() } }))
 vi.mock('../ClearCachePopup', async (importOriginal) => {
   const actual = await importOriginal<typeof ClearCachePopupModule>()
@@ -78,7 +79,11 @@ describe('BasicDataSettings', () => {
 
     expect(screen.getByText('settings.data.backup.skip_file_data_title')).toBeInTheDocument()
 
-    for (const name of ['settings.general.backup.button', 'settings.general.restore.button']) {
+    for (const name of [
+      'settings.general.backup.button',
+      'settings.general.restore.button',
+      'settings.general.restore_conversations.button'
+    ]) {
       const action = screen.getByRole('button', { name })
       expect(action).toBeEnabled()
       expect(action.closest('[inert]')).toBeNull()

@@ -35,7 +35,7 @@ import type { Topic } from '@shared/data/types/topic'
 import { getDataService, registerDataService } from './dataServiceRegistry'
 import { pinService } from './PinService'
 import { tagService } from './TagService'
-import { applyMoves, insertWithOrderKey } from './utils/orderKey'
+import { applyMoves, insertManyWithOrderKey, insertWithOrderKey } from './utils/orderKey'
 import {
   decodePinnedListCursor,
   encodeEntityCursor,
@@ -308,6 +308,23 @@ export class TopicService {
     ) as TopicRow
     getDataService('MessageService').createRootMessageTx(tx, topicRow.id)
     return topicRow
+  }
+
+  /**
+   * Bulk insert topics inside a caller-owned transaction. The caller owns root
+   * creation and active-node mapping; this only enforces the order-key invariant.
+   */
+  importManyTx(tx: DbOrTx, valuesList: Array<Omit<typeof topicTable.$inferInsert, 'orderKey'>>): TopicRow[] {
+    return insertManyWithOrderKey(tx, topicTable, valuesList, {
+      pkColumn: topicTable.id,
+      position: 'first',
+      scope: isNull(topicTable.deletedAt)
+    }) as TopicRow[]
+  }
+
+  /** Permanently delete active topics and their dependent rows inside a caller-owned transaction. */
+  purgeManyPermanentlyTx(tx: DbOrTx, ids: string[]): string[] {
+    return this.purgeManyByIdsTx(tx, ids, { targetState: 'active' })
   }
 
   duplicate(sourceTopicId: string, dto: DuplicateTopicDto): Topic {

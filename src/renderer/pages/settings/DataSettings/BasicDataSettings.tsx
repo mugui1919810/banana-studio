@@ -1,4 +1,4 @@
-import { FolderOpen, FolderOutput, SaveIcon } from 'lucide-react'
+import { FolderOpen, FolderOutput, MessageSquare, SaveIcon } from 'lucide-react'
 import type React from 'react'
 import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -42,6 +42,7 @@ import {
   finalizeLegacyV1Cleanup,
   mergeLegacyV1CleanupResults
 } from './legacyV1BrowserData'
+import RestoreConversationsPopup from './RestoreConversationsPopup'
 import RestorePopup from './RestorePopup'
 import V1RemigrationPopup from './V1RemigrationPopup'
 
@@ -317,6 +318,10 @@ const BasicDataSettings: React.FC = () => {
             <Button onClick={() => RestorePopup.show()} variant="outline">
               <FolderOpen size={14} />
               {t('settings.general.restore.button')}
+            </Button>
+            <Button onClick={() => RestoreConversationsPopup.show()} variant="outline">
+              <MessageSquare size={14} />
+              {t('settings.general.restore_conversations.button')}
             </Button>
           </RowFlex>
         </SettingRow>

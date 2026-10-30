@@ -1092,6 +1092,19 @@ export class MessageService {
   }
 
   /**
+   * Bulk insert messages inside a caller-owned transaction. The caller must
+   * insert parents before children; fts/search columns are intentionally omitted
+   * so the DB triggers own them.
+   */
+  importManyTx(tx: DbOrTx, valuesList: Array<typeof messageTable.$inferInsert>): void {
+    for (let i = 0; i < valuesList.length; i += SQLITE_INSERT_CHUNK) {
+      tx.insert(messageTable)
+        .values(valuesList.slice(i, i + SQLITE_INSERT_CHUNK))
+        .run()
+    }
+  }
+
+  /**
    * Insert the topic's virtual root — the single `parentId = null` row: content-less
    * (`role = 'root'`, empty `data`), never rendered. The dedicated `role = 'root'`
    * makes the row self-identifying, so role-filtered content queries (`role = 'system'`
