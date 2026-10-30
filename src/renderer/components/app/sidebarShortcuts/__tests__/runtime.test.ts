@@ -268,6 +268,19 @@ describe('sidebar conversation navigation', () => {
     expect(state.tabs.find((tab) => tab.id === 'current')?.url).toBe('/app/chat?topicId=topic-1')
   })
 
+  it('opens a new tab for an app shortcut instead of repurposing the Settings tab', async () => {
+    const { context, state } = statefulTabContext([
+      { id: 'settings', type: 'route', url: '/settings/provider', title: 'Settings' },
+      { id: 'sibling', type: 'route', url: '/app/translate', title: 'Translate' }
+    ])
+
+    await activateShortcut(context, 'core.app', 'knowledge')
+
+    expect(state.tabs.find((tab) => tab.id === 'settings')?.url).toBe('/settings/provider')
+    expect(state.tabs.find((tab) => tab.id === state.activeTabId)?.url).toBe('/app/knowledge')
+    expect(state.tabs).toHaveLength(3)
+  })
+
   it('opens a new tab for an app shortcut while a mini app tab stays alive instead of focusing a sibling', async () => {
     const { context, state } = statefulTabContext([
       { id: 'mini-app', type: 'route', url: '/app/mini-app/foo', title: 'Mini App' },

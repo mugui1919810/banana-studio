@@ -17,6 +17,7 @@ import { miniAppIdFromTabUrl } from '@renderer/utils/miniAppKeepAlive'
 import { getSidebarApp, tabBelongsToApp } from '@renderer/utils/sidebar'
 import type { SidebarShortcutItem, SidebarShortcutTarget } from '@shared/data/preference/preferenceTypes'
 import { createSidebarShortcutId } from '@shared/data/preference/preferenceTypes'
+import { isSettingsPath } from '@shared/data/types/settingsPath'
 
 import type { SidebarShortcutRegistry } from './registry'
 import type {
@@ -284,7 +285,8 @@ export function useSidebarActivationGateway(): SidebarActivationGateway {
           setActiveTab(existing.id)
           return
         }
-        if (activeTab && !activeTab.isPinned) {
+        // Settings is a standalone tab, not a workspace slot — never repurpose it.
+        if (activeTab && !activeTab.isPinned && !isSettingsPath(activeTab.url)) {
           if (miniAppIdFromTabUrl(activeTab.url)) {
             // Keep this tab alive for the WebView pool, so the destination gets its own tab. Reuse was
             // already resolved above for destinations that declare an identity.

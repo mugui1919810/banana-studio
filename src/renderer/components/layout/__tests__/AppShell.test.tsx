@@ -220,7 +220,7 @@ describe('AppShell', () => {
     expect(mocks.showSearchPopup).toHaveBeenCalledTimes(1)
   })
 
-  it('focuses the active Settings tab and hides workspace navigation', () => {
+  it('renders Settings as an ordinary tab beside the workspace navigation', () => {
     const settingsTab = {
       id: 'settings',
       isDormant: false,
@@ -233,12 +233,12 @@ describe('AppShell', () => {
 
     render(<AppShell />)
 
-    expect(screen.queryByTestId('sidebar')).not.toBeInTheDocument()
+    expect(screen.getByTestId('sidebar')).toBeInTheDocument()
     expect(mocks.tabBarProps).toMatchObject({
       activeTabId: settingsTab.id,
-      isFocusedTab: true,
-      tabs: [settingsTab]
+      tabs: [mocks.tabs[0], settingsTab]
     })
+    expect(mocks.tabBarProps).not.toHaveProperty('isFocusedTab')
     expect(screen.getAllByTestId('tab-router').map((router) => router.dataset.tabId)).toEqual(['home', 'settings'])
   })
 
@@ -269,7 +269,7 @@ describe('AppShell', () => {
     expect(tabBarTabs?.map((tab) => tab.id)).toEqual(['home', 'settings', 'files'])
   })
 
-  it('restores the tab that was active before Settings when the focused tab closes or detaches', () => {
+  it('returns to the previously active workspace tab when the Settings tab closes or detaches', () => {
     const workspaceTabs = [
       { id: 'first', isDormant: false, title: 'First', type: 'route' as const, url: '/app/chat' },
       { id: 'second', isDormant: false, title: 'Second', type: 'route' as const, url: '/app/files' },
@@ -339,7 +339,7 @@ describe('AppShell', () => {
     expect(mocks.setActiveTab).not.toHaveBeenCalled()
   })
 
-  it('blocks and dismisses global search while the Settings tab is focused', () => {
+  it('opens global search from the Settings tab like any other tab', () => {
     mocks.tabs = [
       ...mocks.tabs,
       {
@@ -355,8 +355,8 @@ describe('AppShell', () => {
     render(<AppShell />)
     mocks.commandHandlers.get('app.search')?.handler()
 
-    expect(mocks.showSearchPopup).not.toHaveBeenCalled()
-    expect(mocks.hideSearchPopup).toHaveBeenCalledTimes(1)
+    expect(mocks.showSearchPopup).toHaveBeenCalledTimes(1)
+    expect(mocks.hideSearchPopup).not.toHaveBeenCalled()
   })
 
   it('keeps the Windows and Linux tab bar inside the content column beside the sidebar', () => {

@@ -54,10 +54,6 @@ export const AppShell = () => {
       return !latest || (tab.lastAccessTime ?? 0) > (latest.lastAccessTime ?? 0) ? tab : latest
     }, undefined)?.id
   }
-  const tabBarTabs = useMemo(
-    () => (isSettingsTabActive && activeTab ? [activeTab] : tabs),
-    [activeTab, isSettingsTabActive, tabs]
-  )
   const isFullscreen = useNativeFullscreen()
   const hasLeadingWindowControls = useLeadingWindowControlsOverlay()
   const handleCloseTab = useCallback(
@@ -81,9 +77,8 @@ export const AppShell = () => {
   )
 
   const handleOpenGlobalSearch = useCallback(() => {
-    if (isSettingsTabActive) return
     void GlobalSearchPopup.show()
-  }, [isSettingsTabActive])
+  }, [])
 
   // Pinned tabs join the same flat cycle, matching Chrome / VS Code Ctrl+Tab.
   const cycleTab = useCallback(
@@ -114,12 +109,6 @@ export const AppShell = () => {
   useCommandHandler('tab.close', handleCloseActiveTab, { enabled: canCloseTab })
   useCommandHandler('tab.next', () => cycleTab('next'), { enabled: canCycleTabs })
   useCommandHandler('tab.prev', () => cycleTab('prev'), { enabled: canCycleTabs })
-
-  useEffect(() => {
-    if (isSettingsTabActive) {
-      GlobalSearchPopup.hide()
-    }
-  }, [isSettingsTabActive])
 
   // The compact minimum tracks the active tab's route here, at window level.
   // It must not live in the pages themselves: they sit inside <Activity>, whose
@@ -175,10 +164,9 @@ export const AppShell = () => {
 
   const tabBar = (
     <AppShellTabBar
-      tabs={tabBarTabs}
+      tabs={tabs}
       activeTabId={activeTabId}
       isFullscreen={isFullscreen}
-      isFocusedTab={isSettingsTabActive}
       setActiveTab={setActiveTab}
       closeTab={handleCloseTab}
       closeTabs={closeTabs}
@@ -192,7 +180,7 @@ export const AppShell = () => {
 
   const contentArea = (
     <>
-      <div className={cn('flex min-h-0 min-w-0 flex-1 flex-col pb-2', isSettingsTabActive ? 'px-2' : 'pr-2')}>
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col pb-2 pr-2">
         <main
           data-ui="app.content"
           className="relative min-h-0 flex-1 overflow-hidden rounded-[12px] border-[0.5px] border-border bg-background">
@@ -233,7 +221,7 @@ export const AppShell = () => {
           'flex h-screen w-screen flex-row overflow-hidden text-foreground',
           isMacTransparentWindow ? 'bg-transparent' : 'bg-sidebar'
         )}>
-        {!isSettingsTabActive && <Sidebar isFullscreen={isFullscreen} />}
+        <Sidebar isFullscreen={isFullscreen} />
         {contentColumn}
       </div>
     )
@@ -252,18 +240,16 @@ export const AppShell = () => {
           className="pointer-events-none absolute top-0 left-0 h-11 w-[env(titlebar-area-x)] [-webkit-app-region:drag]"
         />
       )}
-      {!isSettingsTabActive && (
-        <div className="flex h-full min-h-0 shrink-0 flex-col [&>#app-sidebar]:min-h-0 [&>#app-sidebar]:flex-1">
-          {!isFullscreen && (
-            <div
-              aria-hidden="true"
-              data-testid="macos-traffic-light-spacer"
-              className="h-11 shrink-0 [-webkit-app-region:drag]"
-            />
-          )}
-          <Sidebar isFullscreen={isFullscreen} />
-        </div>
-      )}
+      <div className="flex h-full min-h-0 shrink-0 flex-col [&>#app-sidebar]:min-h-0 [&>#app-sidebar]:flex-1">
+        {!isFullscreen && (
+          <div
+            aria-hidden="true"
+            data-testid="macos-traffic-light-spacer"
+            className="h-11 shrink-0 [-webkit-app-region:drag]"
+          />
+        )}
+        <Sidebar isFullscreen={isFullscreen} />
+      </div>
       {contentColumn}
     </div>
   )
